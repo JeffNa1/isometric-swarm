@@ -17,7 +17,7 @@ var pickup_radius: float = 140.0
 
 var xp: int = 0
 var level: int = 1
-var xp_to_next: int = 43
+var xp_to_next: int = 73
 
 var walk_cycle: float = 0.0
 var facing_right: bool = true
@@ -204,7 +204,7 @@ func take_damage(amount: float) -> void:
 		player_died.emit()
 
 func get_xp_needed(lvl: int) -> int:
-	return int(25.0 + pow(float(lvl), 1.55) * 18.0)
+	return int(45.0 + pow(float(lvl), 1.65) * 28.0)
 
 func add_xp(amount: int) -> void:
 	xp += amount

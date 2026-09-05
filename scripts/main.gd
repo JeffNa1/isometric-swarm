@@ -279,8 +279,8 @@ func _on_enemy_killed(xp_val: int, pos: Vector2, is_boss: bool) -> void:
 		else:
 			next_combo_milestone = 50
 
-	# Spawn physical XP Gem (Drop chance 65% for fodder, 100% for bosses)
-	if randf() < 0.65 or is_boss:
+	# Spawn physical XP Gem (Drop chance 30% for fodder, 100% for bosses)
+	if randf() < 0.30 or is_boss:
 		var gems = get_tree().get_nodes_in_group("gems")
 		if gems.size() >= 300 and not is_boss:
 			# Vampire Survivors gem consolidation: upgrade an existing gem instead of creating new node

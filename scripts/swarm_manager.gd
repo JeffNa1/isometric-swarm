@@ -386,7 +386,7 @@ func _kill_enemy(idx: int) -> void:
 	var pos = positions[idx]
 	var e_type = types[idx]
 	var is_boss = (e_type == 2)
-	var xp = 120 if is_boss else (18 if e_type == 1 else 10)
+	var xp = 45 if is_boss else (3 if e_type == 1 else 1)
 	enemy_killed.emit(xp, pos, is_boss)
 
 	# Audio splat
