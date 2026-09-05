@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3 uid="uid://player_swarm_v2"]
+[gd_scene load_steps=6 format=3 uid="uid://player_swarm_v3"]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/railgun.tscn" id="2_railgun"]
@@ -17,6 +17,11 @@ script = ExtResource("1_player")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -6)
 shape = SubResource("CircleShape2D_player")
+
+[node name="AuraLight" type="PointLight2D" parent="."]
+color = Color(0.25, 0.7, 1.2, 1)
+energy = 0.85
+texture_scale = 3.2
 
 [node name="Weapons" type="Node2D" parent="."]
 

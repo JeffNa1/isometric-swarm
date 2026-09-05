@@ -8,17 +8,38 @@ extends Node2D
 var blast_timer: float = 0.0
 var anim_timer: float = 0.0
 var swarm_mgr: Node2D = null
+var sound_mgr: Node = null
+var particle_mgr: Node2D = null
+var camera_node: Camera2D = null
+
+@onready var blast_light: PointLight2D = $BlastLight
 
 func _ready() -> void:
-	swarm_mgr = get_tree().current_scene.get_node_or_null("SwarmManager")
+	_get_managers()
+	if blast_light:
+		blast_light.texture = LightHelper.get_radial_texture(128)
+		blast_light.energy = 0.0
+
+func _get_managers() -> void:
+	var cur = get_tree().current_scene
+	if cur:
+		swarm_mgr = cur.get_node_or_null("SwarmManager")
+		sound_mgr = cur.get_node_or_null("SoundManager")
+		particle_mgr = cur.get_node_or_null("ParticleManager")
+		camera_node = cur.get_node_or_null("Camera2D")
 
 func _process(delta: float) -> void:
 	if not swarm_mgr:
-		swarm_mgr = get_tree().current_scene.get_node_or_null("SwarmManager")
+		_get_managers()
 
 	if anim_timer > 0.0:
 		anim_timer -= delta
+		if blast_light:
+			blast_light.energy = (anim_timer / 0.28) * 3.5
 		queue_redraw()
+	else:
+		if blast_light and blast_light.energy > 0.0:
+			blast_light.energy = 0.0
 
 	blast_timer += delta
 	if blast_timer >= cooldown:
@@ -30,8 +51,20 @@ func _trigger_blast() -> void:
 		return
 
 	anim_timer = 0.28
-	# Clear out swarm around player
-	swarm_mgr.damage_in_radius(global_position, blast_radius, damage, knockback)
+	var hits = swarm_mgr.damage_in_radius(global_position, blast_radius, damage, knockback)
+
+	if sound_mgr and sound_mgr.has_method("play_shockwave"):
+		sound_mgr.play_shockwave()
+
+	if camera_node and camera_node.has_method("add_trauma"):
+		camera_node.add_trauma(0.42)
+
+	if particle_mgr and hits > 0:
+		for s in range(12):
+			var a = randf() * TAU
+			var p = global_position + Vector2(cos(a) * (blast_radius * 0.75), sin(a) * (blast_radius * 0.38))
+			particle_mgr.spawn_sparks(p, Color(1.8, 1.2, 0.2, 1.0), 6)
+
 	queue_redraw()
 
 func upgrade_blast() -> void:
@@ -41,12 +74,13 @@ func upgrade_blast() -> void:
 
 func _draw() -> void:
 	if anim_timer > 0.0:
-		var progress = 1.0 - (anim_timer / 0.28) # 0 to 1
+		var progress = 1.0 - (anim_timer / 0.28)
 		var current_r = blast_radius * progress
-		var alpha = (1.0 - progress) * 0.7
+		var alpha = (1.0 - progress) * 0.85
 		
-		# 2:1 isometric ring compression
+		# HDR Glowing Isometric shockwave rings
 		draw_set_transform(Vector2(0, -10), 0.0, Vector2(1.0, 0.5))
-		draw_arc(Vector2.ZERO, current_r, 0.0, TAU, 48, Color(1.0, 0.4, 0.1, alpha), 8.0)
-		draw_arc(Vector2.ZERO, current_r * 0.85, 0.0, TAU, 48, Color(1.0, 0.85, 0.2, alpha * 0.8), 4.0)
+		draw_arc(Vector2.ZERO, current_r, 0.0, TAU, 48, Color(2.5, 0.8, 0.2, alpha), 8.0)
+		draw_arc(Vector2.ZERO, current_r * 0.88, 0.0, TAU, 48, Color(3.0, 2.0, 0.5, alpha * 0.9), 4.5)
+		draw_arc(Vector2.ZERO, current_r * 0.65, 0.0, TAU, 36, Color(1.5, 0.3, 0.05, alpha * 0.5), 12.0)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

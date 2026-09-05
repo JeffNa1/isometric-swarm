@@ -22,13 +22,16 @@ var kills: int = 0
 var swarm_count: int = 0
 var player_node: Node2D = null
 
+var target_hp: float = 120.0
+var max_hp: float = 120.0
+
 const UPGRADES = [
-	{"id": "railgun", "title": "⚡ Cường Hóa Railgun", "desc": "Tăng mạnh độ rộng chùm laser và sát thương xuyên thấu."},
-	{"id": "flame", "title": "🔥 Bão Lửa Plasma", "desc": "Mở rộng góc thiêu đốt và tầm phun lửa phía trước."},
-	{"id": "shockwave", "title": "💥 Sóng Chấn Động Nova", "desc": "Tăng bán kính vụ nổ đẩy lùi quái và giảm thời gian nạp."},
-	{"id": "damage", "title": "⚔️ Tăng Sát Thương 30%", "desc": "Gia tăng uy lực tiêu diệt hàng loạt trên mọi vũ khí."},
-	{"id": "speed", "title": "👟 Động Cơ Phản Lực", "desc": "Tăng 40 tốc độ di chuyển để thoát khỏi vòng vây quái."},
-	{"id": "health", "title": "❤️ Tăng Cường Sinh Lực", "desc": "Tăng 40 máu tối đa và hồi phục khẩn cấp 80 HP."}
+	{"id": "railgun", "title": "⚡ CƯỜNG HÓA RAILGUN", "desc": "Tăng mạnh độ rộng chùm laser và sát thương xuyên thấu bầy quái."},
+	{"id": "flame", "title": "🔥 BÃO LỬA PLASMA", "desc": "Mở rộng góc thiêu đốt và tầm phun lửa phía trước mặt."},
+	{"id": "shockwave", "title": "💥 SÓNG CHẤN ĐỘNG NOVA", "desc": "Tăng bán kính nổ hất tung quái và giảm thời gian nạp chiêu."},
+	{"id": "damage", "title": "⚔️ TĂNG 30% SÁT THƯƠNG", "desc": "Gia tăng uy lực tiêu diệt hàng loạt trên mọi vũ khí."},
+	{"id": "speed", "title": "👟 ĐỘNG CƠ PHẢN LỰC", "desc": "Tăng 40 tốc độ di chuyển để luồn lách né tránh vòng vây."},
+	{"id": "health", "title": "❤️ TĂNG CƯỜNG SINH LỰC", "desc": "Tăng 40 máu tối đa và hồi phục khẩn cấp 80 HP ngay lập tức."}
 ]
 
 func _ready() -> void:
@@ -46,11 +49,16 @@ func _process(delta: float) -> void:
 		var secs = int(survival_seconds) % 60
 		timer_label.text = "%02d:%02d" % [mins, secs]
 		fps_label.text = "%d FPS" % Engine.get_frames_per_second()
+		
+		# Smooth juicy health bar interpolation
+		hp_bar.value = lerp(float(hp_bar.value), target_hp, 14.0 * delta)
+		
 		radar_rect.queue_redraw()
 
 func update_health(current: float, maximum: float) -> void:
+	max_hp = maximum
+	target_hp = current
 	hp_bar.max_value = maximum
-	hp_bar.value = current
 	hp_label.text = "%d / %d HP" % [int(current), int(maximum)]
 
 func update_xp(current: int, target: int, lvl: int) -> void:
@@ -90,12 +98,13 @@ func show_level_up(lvl: int) -> void:
 		title.text = item.title
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		title.autowrap_mode = TextServer.AUTOWRAP_WORD
+		title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2, 1.0))
 
 		var desc = Label.new()
 		desc.text = item.desc
 		desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-		desc.modulate = Color(0.8, 0.85, 0.95, 0.85)
+		desc.add_theme_color_override("font_color", Color(0.8, 0.88, 1.0, 0.85))
 
 		vbox.add_child(title)
 		vbox.add_child(desc)
@@ -129,18 +138,23 @@ func _on_radar_draw() -> void:
 	var r_radius = min(r_size.x, r_size.y) * 0.5 - 4.0
 
 	# Radar background & rings
-	radar_rect.draw_circle(r_center, r_radius, Color(0.04, 0.08, 0.12, 0.85))
-	radar_rect.draw_arc(r_center, r_radius, 0.0, TAU, 32, Color(0.2, 0.6, 1.0, 0.8), 2.0)
-	radar_rect.draw_arc(r_center, r_radius * 0.5, 0.0, TAU, 24, Color(0.2, 0.6, 1.0, 0.3), 1.0)
+	radar_rect.draw_circle(r_center, r_radius, Color(0.03, 0.06, 0.10, 0.9))
+	radar_rect.draw_arc(r_center, r_radius, 0.0, TAU, 32, Color(0.3, 0.8, 1.5, 0.85), 2.0)
+	radar_rect.draw_arc(r_center, r_radius * 0.5, 0.0, TAU, 24, Color(0.3, 0.8, 1.5, 0.35), 1.0)
 	
-	# Radar crosshair
-	radar_rect.draw_line(Vector2(r_center.x, 4), Vector2(r_center.x, r_size.y - 4), Color(0.2, 0.6, 1.0, 0.25), 1.0)
-	radar_rect.draw_line(Vector2(4, r_center.y), Vector2(r_size.x - 4, r_center.y), Color(0.2, 0.6, 1.0, 0.25), 1.0)
+	# Crosshairs
+	radar_rect.draw_line(Vector2(r_center.x, 4), Vector2(r_center.x, r_size.y - 4), Color(0.3, 0.8, 1.5, 0.3), 1.0)
+	radar_rect.draw_line(Vector2(4, r_center.y), Vector2(r_size.x - 4, r_center.y), Color(0.3, 0.8, 1.5, 0.3), 1.0)
 
-	# Player dot on map (Scale 10,000 px arena to radar radius)
+	# Radar sweep line rotating
+	var sweep_angle = Time.get_ticks_msec() * 0.003
+	var sweep_end = r_center + Vector2.from_angle(sweep_angle) * (r_radius * 0.95)
+	radar_rect.draw_line(r_center, sweep_end, Color(0.4, 0.9, 1.8, 0.4), 1.5)
+
+	# Player dot on map
 	if is_instance_valid(player_node):
 		var p_pos = player_node.global_position
 		var norm_x = clamp(p_pos.x / 5000.0, -1.0, 1.0)
 		var norm_y = clamp(p_pos.y / 5000.0, -1.0, 1.0)
 		var p_radar_pos = r_center + Vector2(norm_x, norm_y) * (r_radius * 0.9)
-		radar_rect.draw_circle(p_radar_pos, 3.5, Color(0.2, 1.0, 0.4, 1.0))
+		radar_rect.draw_circle(p_radar_pos, 4.0, Color(0.2, 1.8, 0.5, 1.0))

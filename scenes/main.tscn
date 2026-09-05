@@ -1,25 +1,48 @@
-[gd_scene load_steps=6 format=3 uid="uid://main_swarm_v2"]
+[gd_scene load_steps=11 format=3 uid="uid://main_swarm_ultimate"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/arena.tscn" id="2_arena"]
 [ext_resource type="PackedScene" path="res://scenes/swarm_manager.tscn" id="3_swarm"]
-[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="4_player"]
-[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://scenes/particle_manager.tscn" id="4_part"]
+[ext_resource type="PackedScene" path="res://scenes/floating_text_manager.tscn" id="5_ftxt"]
+[ext_resource type="PackedScene" path="res://scenes/sound_manager.tscn" id="6_sound"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="7_player"]
+[ext_resource type="Script" path="res://scripts/camera.gd" id="8_cam"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="9_hud"]
+
+[sub_resource type="Environment" id="Environment_glow"]
+background_mode = 3
+glow_enabled = true
+glow_intensity = 0.85
+glow_strength = 1.05
+glow_bloom = 0.22
+glow_blend_mode = 0
+tonemap_mode = 2
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_glow")
 
 [node name="Arena" parent="." instance=ExtResource("2_arena")]
 
 [node name="SwarmManager" parent="." instance=ExtResource("3_swarm")]
 
+[node name="ParticleManager" parent="." instance=ExtResource("4_part")]
+
+[node name="FloatingTextManager" parent="." instance=ExtResource("5_ftxt")]
+
+[node name="SoundManager" parent="." instance=ExtResource("6_sound")]
+
 [node name="Entities" type="Node2D" parent="."]
 y_sort_enabled = true
 
-[node name="Player" parent="Entities" instance=ExtResource("4_player")]
+[node name="Player" parent="Entities" instance=ExtResource("7_player")]
 
 [node name="Camera2D" type="Camera2D" parent="."]
 zoom = Vector2(0.9, 0.9)
 position_smoothing_enabled = true
+script = ExtResource("8_cam")
 
-[node name="HUD" parent="." instance=ExtResource("5_hud")]
+[node name="HUD" parent="." instance=ExtResource("9_hud")]
