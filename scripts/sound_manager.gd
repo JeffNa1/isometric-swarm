@@ -23,6 +23,9 @@ var snd_tesla: AudioStreamWAV
 var snd_mortar: AudioStreamWAV
 var snd_acid: AudioStreamWAV
 var snd_crate: AudioStreamWAV
+var snd_ui_hover: AudioStreamWAV
+var snd_ui_click: AudioStreamWAV
+var snd_ui_back: AudioStreamWAV
 
 # Dopamine gem chime streak tracking
 var gem_streak: int = 0
@@ -62,6 +65,26 @@ func _generate_all_sounds() -> void:
 	snd_mortar = _synth_mortar()
 	snd_acid = _synth_acid()
 	snd_crate = _synth_crate()
+	snd_ui_hover = _synth_ui_hover()
+	snd_ui_click = _synth_ui_click()
+	snd_ui_back = _synth_ui_back()
+
+func play_ui_hover() -> void:
+	_play(snd_ui_hover, -10.0, randf_range(0.96, 1.04))
+
+func play_ui_click() -> void:
+	_play(snd_ui_click, -6.0, randf_range(0.98, 1.02))
+
+func play_ui_back() -> void:
+	_play(snd_ui_back, -7.0, 1.0)
+
+func set_master_volume(linear_val: float) -> void:
+	var bus_idx = AudioServer.get_bus_index("Master")
+	if linear_val <= 0.001:
+		AudioServer.set_bus_mute(bus_idx, true)
+	else:
+		AudioServer.set_bus_mute(bus_idx, false)
+		AudioServer.set_bus_volume_db(bus_idx, linear_to_db(clamp(linear_val, 0.001, 1.0)))
 
 func play_laser() -> void:
 	_play(snd_laser, -5.0, randf_range(0.93, 1.07))
@@ -483,3 +506,61 @@ func _make_wav(data: PackedByteArray) -> AudioStreamWAV:
 	wav.mix_rate = SAMPLE_RATE
 	wav.data = data
 	return wav
+
+# Synth 15: UI Hover Blip
+func _synth_ui_hover() -> AudioStreamWAV:
+	var duration = 0.035
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var phase = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var freq = lerp(1400.0, 1950.0, t)
+		phase += TAU * freq / float(SAMPLE_RATE)
+		var env = pow(1.0 - t, 2.2)
+		var sample = sin(phase) * env * 0.4
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth 16: UI Click Chirp
+func _synth_ui_click() -> AudioStreamWAV:
+	var duration = 0.055
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var phase = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var freq = lerp(600.0, 1400.0, sqrt(t))
+		phase += TAU * freq / float(SAMPLE_RATE)
+		var env = pow(1.0 - t, 1.6)
+		# Blend sine with harmonic for tactile "snappy" feedback
+		var sample = (sin(phase) * 0.7 + sin(phase * 2.0) * 0.3) * env * 0.55
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth 17: UI Back / Dismiss Click
+func _synth_ui_back() -> AudioStreamWAV:
+	var duration = 0.05
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var phase = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var freq = lerp(420.0, 210.0, t)
+		phase += TAU * freq / float(SAMPLE_RATE)
+		var env = pow(1.0 - t, 2.0)
+		var sample = sin(phase) * env * 0.45
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)

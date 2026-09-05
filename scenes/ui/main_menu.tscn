@@ -1,0 +1,349 @@
+[gd_scene load_steps=5 format=3 uid="uid://main_menu_v1"]
+
+[ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
+[ext_resource type="Shader" path="res://shaders/menu_background.gdshader" id="2_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bg"]
+shader = ExtResource("2_shader")
+shader_parameter/bg_color = Color(0.03, 0.045, 0.08, 1)
+shader_parameter/grid_color = Color(0.08, 0.16, 0.32, 0.45)
+shader_parameter/pulse_line_color = Color(0.1, 0.85, 1.4, 0.95)
+shader_parameter/grid_scale = 56.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_modal"]
+bg_color = Color(0.05, 0.08, 0.15, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.2, 0.8, 1.4, 0.9)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0, 0, 0, 0.8)
+shadow_size = 20
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="ShaderBackground" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_bg")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="BackgroundOverlay" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 80
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_right = 80
+theme_override_constants/margin_bottom = 50
+
+[node name="Content" type="HBoxContainer" parent="Margin"]
+layout_mode = 2
+
+[node name="LeftCol" type="VBoxContainer" parent="Margin/Content"]
+custom_minimum_size = Vector2(460, 0)
+layout_mode = 2
+
+[node name="TitleBox" type="VBoxContainer" parent="Margin/Content/LeftCol"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TitleLabel" type="Label" parent="Margin/Content/LeftCol/TitleBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.9, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.05, 0.2, 0.4, 0.9)
+theme_override_constants/shadow_offset_x = 3
+theme_override_constants/shadow_offset_y = 3
+theme_override_font_sizes/font_size = 44
+text = "ISOMETRIC SWARM"
+
+[node name="SubtitleBadge" type="PanelContainer" parent="Margin/Content/LeftCol/TitleBox"]
+layout_mode = 2
+size_flags_horizontal = 0
+
+[node name="SubtitleLabel" type="Label" parent="Margin/Content/LeftCol/TitleBox/SubtitleBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.75, 0.15, 1)
+theme_override_font_sizes/font_size = 14
+text = " CYBER APOCALYPSE • KHẢI HUYỀN BẦY QUÁI "
+
+[node name="Spacer" type="Control" parent="Margin/Content/LeftCol"]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+
+[node name="ButtonsVBox" type="VBoxContainer" parent="Margin/Content/LeftCol"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="BtnPlay" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
+custom_minimum_size = Vector2(340, 52)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "VÀO TRẬN (START)"
+alignment = 0
+
+[node name="BtnHowToPlay" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
+custom_minimum_size = Vector2(340, 48)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "CẨM NANG SINH TỒN"
+alignment = 0
+
+[node name="BtnSettings" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
+custom_minimum_size = Vector2(340, 48)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "THIẾT LẬP HỆ THỐNG"
+alignment = 0
+
+[node name="BtnCredits" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
+custom_minimum_size = Vector2(340, 48)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "DANH THẦN & ĐỘI NGŨ"
+alignment = 0
+
+[node name="BtnQuit" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
+custom_minimum_size = Vector2(340, 48)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
+theme_override_font_sizes/font_size = 16
+text = "THOÁT RA DESKTOP"
+alignment = 0
+
+[node name="Spacer2" type="Control" parent="Margin/Content/LeftCol"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="FooterLabel" type="Label" parent="Margin/Content/LeftCol"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.5, 0.7, 0.8)
+theme_override_font_sizes/font_size = 12
+text = "v1.4.0 • GODOT 4.3 FORWARD+ • 60 FPS CAP • MULTIMESH TECH"
+
+[node name="SettingsModal" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -180.0
+offset_right = 260.0
+offset_bottom = 180.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
+
+[node name="VBox" type="VBoxContainer" parent="SettingsModal"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="SettingsModal/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 22
+text = "⚙ THIẾT LẬP HỆ THỐNG"
+horizontal_alignment = 1
+
+[node name="VolumeRow" type="HBoxContainer" parent="SettingsModal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SoundIcon" type="TextureRect" parent="SettingsModal/VBox/VolumeRow"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SettingsModal/VBox/VolumeRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Âm Lượng Tổng:"
+
+[node name="VolumeSlider" type="HSlider" parent="SettingsModal/VBox/VolumeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+value = 100.0
+
+[node name="VolumeValue" type="Label" parent="SettingsModal/VBox/VolumeRow"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="ShakeRow" type="HBoxContainer" parent="SettingsModal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="SettingsModal/VBox/ShakeRow"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+text = "Độ Rung (Screen Shake):"
+
+[node name="ShakeSlider" type="HSlider" parent="SettingsModal/VBox/ShakeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+value = 100.0
+
+[node name="ShakeValue" type="Label" parent="SettingsModal/VBox/ShakeRow"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="DmgNumRow" type="HBoxContainer" parent="SettingsModal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="SettingsModal/VBox/DmgNumRow"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+text = "Hiện Số Sát Thương:"
+
+[node name="DmgNumToggle" type="Button" parent="SettingsModal/VBox/DmgNumRow"]
+custom_minimum_size = Vector2(100, 32)
+layout_mode = 2
+text = " [ BẬT ] "
+
+[node name="Spacer" type="Control" parent="SettingsModal/VBox"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="BtnSettingsBack" type="Button" parent="SettingsModal/VBox"]
+custom_minimum_size = Vector2(180, 42)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "◀ ĐÓNG THIẾT LẬP"
+
+[node name="HowToPlayModal" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -480.0
+offset_top = -210.0
+offset_right = 480.0
+offset_bottom = 210.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
+
+[node name="VBox" type="VBoxContainer" parent="HowToPlayModal"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="HowToPlayModal/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "📖 CẨM NANG TÁC CHIẾN & SINH TỒN"
+horizontal_alignment = 1
+
+[node name="CardsContainer" type="HBoxContainer" parent="HowToPlayModal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="BtnHowToPlayBack" type="Button" parent="HowToPlayModal/VBox"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "◀ QUAY LẠI MENU"
+
+[node name="CreditsModal" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -190.0
+offset_right = 300.0
+offset_bottom = 190.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
+
+[node name="VBox" type="VBoxContainer" parent="CreditsModal"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="CreditsModal/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 22
+text = "🎖 DANH THẦN & THÔNG TIN DỰ ÁN"
+horizontal_alignment = 1
+
+[node name="CreditsText" type="Label" parent="CreditsModal/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 13
+text = "> PROJECT: ISOMETRIC SWARM: CYBER APOCALYPSE
+> ENGINE: Godot Engine 4.3 Stable (Forward+ / GL Compatibility)
+> RENDERER: MultiMesh 2D GPU Swarm Instancing (5,000+ Units)
+> AUDIO: Real-time 22.05kHz 16-bit Synthesized Procedural Sound Engine
+> ART: 100% Procedural Pixel-Art & Cyber-Isometric Shaders
+> ARCHITECTURE: Antigravity AI Pair Programming Session
+> STATUS: All Systems Nominal. 60 FPS Locked."
+
+[node name="Spacer" type="Control" parent="CreditsModal/VBox"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="BtnCreditsBack" type="Button" parent="CreditsModal/VBox"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "◀ QUAY LẠI MENU"
+
+[node name="TransitionRect" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)

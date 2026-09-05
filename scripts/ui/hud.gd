@@ -25,6 +25,13 @@ signal upgrade_selected(upgrade_id: String)
 @onready var chest_rewards_container: HBoxContainer = $ChestModal/VBox/RewardsContainer
 @onready var chest_claim_btn: Button = $ChestModal/VBox/ClaimButton
 
+@onready var restart_button: Button = $GameOverModal/VBox/ButtonsRow/RestartButton
+@onready var menu_button: Button = $GameOverModal/VBox/ButtonsRow/MenuButton
+@onready var pause_modal: PanelContainer = $PauseModal
+@onready var pause_resume_btn: Button = $PauseModal/VBox/ResumeButton
+@onready var pause_restart_btn: Button = $PauseModal/VBox/PauseRestartButton
+@onready var pause_menu_btn: Button = $PauseModal/VBox/PauseMenuButton
+
 var survival_seconds: float = 0.0
 var kills: int = 0
 var swarm_count: int = 0
@@ -46,7 +53,14 @@ func _ready() -> void:
 	game_over_panel.hide()
 	if boss_container: boss_container.hide()
 	if chest_modal: chest_modal.hide()
-	$GameOverModal/VBox/RestartButton.pressed.connect(_on_restart_pressed)
+	if pause_modal: pause_modal.hide()
+
+	if restart_button: restart_button.pressed.connect(_on_restart_pressed)
+	if menu_button: menu_button.pressed.connect(_on_menu_pressed)
+	if pause_resume_btn: pause_resume_btn.pressed.connect(_on_resume_pressed)
+	if pause_restart_btn: pause_restart_btn.pressed.connect(_on_restart_pressed)
+	if pause_menu_btn: pause_menu_btn.pressed.connect(_on_menu_pressed)
+
 	if chest_claim_btn:
 		chest_claim_btn.pressed.connect(_on_chest_claim_pressed)
 	player_node = get_tree().get_first_node_in_group("player")
@@ -153,7 +167,7 @@ func _create_reward_card(item: Dictionary) -> PanelContainer:
 
 	var vbox = VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.theme_override_constants.separation = 8
+	vbox.add_theme_constant_override("separation", 8)
 
 	var stars = Label.new()
 	stars.text = item.stars
@@ -464,6 +478,24 @@ func show_game_over(level: int) -> void:
 	var secs = int(survival_seconds) % 60
 	game_over_stats.text = "Thời gian sinh tồn: %02d:%02d\nCấp độ đạt được: LVL %d\nSố quái đã tiêu diệt: %d" % [mins, secs, level, kills]
 	game_over_panel.show()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		if not level_up_panel.visible and not chest_modal.visible and not game_over_panel.visible:
+			if pause_modal.visible:
+				_on_resume_pressed()
+			else:
+				get_tree().paused = true
+				pause_modal.show()
+
+func _on_resume_pressed() -> void:
+	if pause_modal:
+		pause_modal.hide()
+	get_tree().paused = false
+
+func _on_menu_pressed() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
 
 func _on_restart_pressed() -> void:
 	get_tree().paused = false

@@ -271,8 +271,62 @@ layout_mode = 2
 text = "Thời gian: 00:00"
 horizontal_alignment = 1
 
-[node name="RestartButton" type="Button" parent="GameOverModal/VBox"]
-custom_minimum_size = Vector2(160, 45)
+[node name="ButtonsRow" type="HBoxContainer" parent="GameOverModal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="RestartButton" type="Button" parent="GameOverModal/VBox/ButtonsRow"]
+custom_minimum_size = Vector2(140, 44)
+layout_mode = 2
+text = "🔄 CHƠI LẠI"
+
+[node name="MenuButton" type="Button" parent="GameOverModal/VBox/ButtonsRow"]
+custom_minimum_size = Vector2(140, 44)
+layout_mode = 2
+text = "🏠 MENU CHÍNH"
+
+[node name="PauseModal" type="PanelContainer" parent="."]
+process_mode = 2
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -120.0
+offset_right = 180.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="PauseModal"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="Title" type="Label" parent="PauseModal/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "⏸️ TẠM DỪNG TRẬN ĐẤU"
+horizontal_alignment = 1
+
+[node name="ResumeButton" type="Button" parent="PauseModal/VBox"]
+custom_minimum_size = Vector2(200, 40)
 layout_mode = 2
 size_flags_horizontal = 4
-text = "🔄 CHƠI LẠI"
+text = "▶️ TIẾP TỤC CHIẾN"
+
+[node name="PauseRestartButton" type="Button" parent="PauseModal/VBox"]
+custom_minimum_size = Vector2(200, 40)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "🔄 CHƠI LẠI TỪ ĐẦU"
+
+[node name="PauseMenuButton" type="Button" parent="PauseModal/VBox"]
+custom_minimum_size = Vector2(200, 40)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "🏠 VỀ MENU CHÍNH"

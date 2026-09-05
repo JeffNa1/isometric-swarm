@@ -741,3 +741,199 @@ static func _draw_circle_on_image(img: Image, center: Vector2, radius: float, co
 			if dx * dx + dy * dy <= r_sq:
 				if x >= 0 and x < img.get_width() and y >= 0 and y < img.get_height():
 					img.set_pixel(x, y, col)
+
+
+static func create_menu_icon(icon_name: String) -> ImageTexture:
+	var w = 28
+	var h = 28
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	match icon_name:
+		"play":
+			# Glowing neon cyan play triangle with plasma white core
+			for y in range(5, 24):
+				var progress = float(y - 5) / 18.0
+				var max_x = int(lerp(7.0, 23.0, 1.0 - abs(progress - 0.5) * 2.0))
+				for x in range(7, max_x + 1):
+					var col = Color(0.1, 0.8, 1.8, 0.9)
+					if x == 7 or x == max_x or y == 5 or y == 23:
+						col = Color(0.3, 2.8, 3.8, 1.0)
+					if x >= 9 and x <= max_x - 2 and abs(y - 14) <= 4:
+						col = Color(3.5, 3.5, 4.0, 1.0) # White hot core
+					img.set_pixel(x, y, col)
+
+		"settings":
+			# Precision cyber cogwheel gear with 6 teeth and central glowing blue micro-reactor
+			var center = Vector2(14, 14)
+			# Gear body
+			for y in range(3, 26):
+				for x in range(3, 26):
+					var diff = Vector2(x, y) - center
+					var dist = diff.length()
+					var angle = diff.angle()
+					var tooth = cos(angle * 6.0)
+					var radius_limit = 8.5 + tooth * 2.5
+					if dist <= radius_limit and dist >= 3.5:
+						var col = Color(2.5, 1.8, 0.4, 1.0) # Amber metallic
+						if dist > radius_limit - 1.2: col = Color(3.2, 2.4, 0.8, 1.0)
+						img.set_pixel(x, y, col)
+					elif dist < 3.5:
+						# Cyan central core
+						var col = Color(0.2, 2.5, 3.8, 1.0) if dist > 1.2 else Color(3.8, 3.8, 4.0, 1.0)
+						img.set_pixel(x, y, col)
+
+		"how_to_play":
+			# Holographic combat HUD helmet with cyan/green scanning visor
+			for y in range(4, 24):
+				for x in range(5, 24):
+					var dx = (x - 14.0) / 8.5
+					var dy = (y - 14.0) / 9.0
+					var d = dx * dx + dy * dy
+					if d <= 1.0:
+						var col = Color(0.12, 0.18, 0.28, 0.95)
+						if d > 0.75: col = Color(0.2, 1.4, 2.2, 1.0)
+						# Neon scanning visor slit
+						if y >= 12 and y <= 15 and abs(x - 14) <= 6:
+							col = Color(0.2, 3.5, 1.8, 1.0)
+							if x == 14: col = Color(3.8, 3.8, 2.0, 1.0) # Scan dot
+						img.set_pixel(x, y, col)
+
+		"credits":
+			# Golden laurel victory medallion with sparkling star core
+			var center = Vector2(14, 12)
+			for y in range(3, 21):
+				for x in range(5, 24):
+					var dist = (Vector2(x, y) - center).length()
+					if dist <= 7.5:
+						var col = Color(2.8, 2.0, 0.3, 0.95)
+						if dist > 6.0: col = Color(3.5, 2.8, 0.8, 1.0)
+						# 4-pointed star in center
+						if abs(x - 14) <= 1 or abs(y - 12) <= 1:
+							col = Color(3.8, 3.8, 3.5, 1.0)
+						img.set_pixel(x, y, col)
+			# Ribbon hanging
+			for y in range(19, 26):
+				var r_w = (y - 19)
+				img.set_pixel(11 - r_w, y, Color(0.2, 1.5, 2.8, 1.0))
+				img.set_pixel(17 + r_w, y, Color(0.2, 1.5, 2.8, 1.0))
+
+		"quit":
+			# Crimson nuclear power shutdown glyph
+			var center = Vector2(14, 14)
+			for y in range(4, 25):
+				for x in range(4, 25):
+					var diff = Vector2(x, y) - center
+					var dist = diff.length()
+					if dist >= 6.0 and dist <= 9.0:
+						# Gap at top for vertical line
+						if not (abs(x - 14) <= 2 and y < 14):
+							var col = Color(3.5, 0.3, 0.4, 1.0)
+							img.set_pixel(x, y, col)
+			# Vertical stroke
+			for y in range(4, 15):
+				for x in range(13, 16):
+					img.set_pixel(x, y, Color(3.8, 2.0, 2.2, 1.0))
+
+		"sound_on":
+			# Cyber speaker with emitting concentric cyan waves
+			# Speaker body
+			for y in range(8, 21):
+				for x in range(5, 13):
+					var in_cone = (x >= 8 and abs(y - 14) <= (x - 7) * 2) or (x < 8 and abs(y - 14) <= 3)
+					if in_cone:
+						var col = Color(0.25, 1.2, 2.0, 1.0)
+						if x == 5 or abs(y - 14) == 3: col = Color(0.4, 2.0, 3.2, 1.0)
+						img.set_pixel(x, y, col)
+			# Sound waves
+			for y in range(6, 23):
+				for x in range(15, 25):
+					var d1 = abs(Vector2(x - 12, y - 14).length() - 5.5)
+					var d2 = abs(Vector2(x - 12, y - 14).length() - 9.0)
+					if (d1 < 0.9 or d2 < 0.9) and x > 12:
+						img.set_pixel(x, y, Color(0.3, 2.8, 3.8, 1.0))
+
+		"sound_off":
+			# Speaker body with bright red laser strike
+			for y in range(8, 21):
+				for x in range(5, 13):
+					var in_cone = (x >= 8 and abs(y - 14) <= (x - 7) * 2) or (x < 8 and abs(y - 14) <= 3)
+					if in_cone:
+						img.set_pixel(x, y, Color(0.18, 0.22, 0.28, 0.8))
+			# Red diagonal slash
+			for i in range(5, 23):
+				img.set_pixel(i, i, Color(3.8, 0.4, 0.5, 1.0))
+				img.set_pixel(i + 1, i, Color(3.0, 0.2, 0.3, 0.8))
+
+		"wasd":
+			# 4 glowing cyber keycaps: W (top), A (left), S (center), D (right)
+			var keys = [Vector2(14, 8), Vector2(7, 18), Vector2(14, 18), Vector2(21, 18)]
+			for kp in keys:
+				for y in range(int(kp.y) - 3, int(kp.y) + 4):
+					for x in range(int(kp.x) - 3, int(kp.x) + 4):
+						if abs(x - kp.x) <= 3 and abs(y - kp.y) <= 3:
+							var col = Color(0.12, 0.16, 0.25, 1.0)
+							if abs(x - kp.x) == 3 or abs(y - kp.y) == 3:
+								col = Color(0.3, 2.2, 3.5, 1.0)
+							if x == int(kp.x) and y == int(kp.y):
+								col = Color(3.5, 3.5, 4.0, 1.0) # Key label dot
+							img.set_pixel(x, y, col)
+
+		"auto_aim":
+			# Tactical military reticle crosshair with 4 brackets & laser dot
+			var center = Vector2(14, 14)
+			for y in range(4, 25):
+				for x in range(4, 25):
+					var dist = (Vector2(x, y) - center).length()
+					if abs(dist - 8.0) <= 0.8:
+						# 4 gaps in circle
+						if abs(x - 14) > 2 and abs(y - 14) > 2:
+							img.set_pixel(x, y, Color(0.3, 2.5, 3.8, 0.9))
+			# Center red laser dot
+			_draw_circle_on_image(img, center, 2.0, Color(3.8, 0.3, 0.3, 1.0))
+			img.set_pixel(14, 14, Color(3.8, 3.0, 2.0, 1.0))
+
+		"chest":
+			# Golden relic treasure chest icon
+			for y in range(8, 22):
+				for x in range(6, 23):
+					var col = Color(2.5, 1.8, 0.3, 0.95)
+					if x == 6 or x == 22 or y == 8 or y == 21:
+						col = Color(3.5, 2.8, 0.8, 1.0)
+					if y == 14: col = Color(0.2, 0.15, 0.05, 1.0) # Lid seam
+					if abs(x - 14) <= 1 and abs(y - 15) <= 1:
+						col = Color(3.8, 3.8, 4.0, 1.0) # Lock
+					img.set_pixel(x, y, col)
+
+		"evolution":
+			# Crown of super evolution with dual lightning bolts
+			for y in range(6, 17):
+				for x in range(5, 24):
+					var in_crown = (y >= 14 and abs(x - 14) <= 8) or (y < 14 and (abs(x - 14) <= 2 or abs(x - 7) <= 2 or abs(x - 21) <= 2))
+					if in_crown:
+						var col = Color(3.5, 0.8, 1.8, 1.0) # Neon magenta
+						if y == 6: col = Color(3.8, 3.5, 1.0, 1.0) # Jewels on tips
+						img.set_pixel(x, y, col)
+			# Symmetrical lightning below
+			for y in range(18, 25):
+				img.set_pixel(11, y, Color(0.4, 2.8, 3.8, 1.0))
+				img.set_pixel(17, y, Color(0.4, 2.8, 3.8, 1.0))
+
+		"back":
+			# Left-pointing cyber chevron with trailing glow
+			for y in range(6, 23):
+				var target_x = int(lerp(8.0, 20.0, abs(float(y - 14) / 8.0)))
+				for thick in range(3):
+					var px = target_x + thick
+					if px >= 0 and px < w:
+						var col = Color(0.3, 2.5, 3.8, 1.0) if thick == 0 else Color(0.1, 1.2, 2.2, 0.6)
+						img.set_pixel(px, y, col)
+			img.set_pixel(23, 14, Color(0.3, 2.5, 3.8, 0.8))
+			img.set_pixel(25, 14, Color(0.2, 1.8, 3.0, 0.4))
+
+		_:
+			# Default glowing dot
+			_draw_circle_on_image(img, Vector2(14, 14), 6.0, Color(0.3, 2.5, 3.8, 1.0))
+
+	return ImageTexture.create_from_image(img)
+
