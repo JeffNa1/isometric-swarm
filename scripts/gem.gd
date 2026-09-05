@@ -60,7 +60,7 @@ func _process(delta: float) -> void:
 						snd.play_gem_pickup()
 				var pm = cur.get_node_or_null("ParticleManager")
 				if pm:
-					var p_col = Color(3.5, 2.5, 0.5, 1.0) if is_super_gem else Color(0.3, 2.8, 3.8, 1.0)
+					var p_col = Color(3.5, 2.5, 0.5, 1.0) if is_super_gem else Color(0.4, 3.2, 1.2, 1.0)
 					pm.spawn_sparks(target.global_position + Vector2(0, -18), p_col, 4)
 			queue_free()
 
@@ -91,4 +91,4 @@ func _draw() -> void:
 		else:
 			draw_texture(gem_tex, draw_pos)
 			var pulse = 0.8 + 0.3 * sin(time_alive * 7.0)
-			draw_circle(Vector2(0, -8.0 + bob_offset), 2.0, Color(0.4 * pulse, 2.8 * pulse, 3.8 * pulse, 0.9))
+			draw_circle(Vector2(0, -8.0 + bob_offset), 2.2, Color(0.4 * pulse, 3.2 * pulse, 1.2 * pulse, 0.95))

@@ -465,13 +465,13 @@ static func create_gem_texture() -> ImageTexture:
 		var dy = abs(y - 10) / 7.0
 		var half_w = int((1.0 - dy) * 6.0)
 		for x in range(12 - half_w, 12 + half_w + 1):
-			var facet_col = Color(0.1, 0.8, 0.95, 0.95)
+			var facet_col = Color(0.15, 0.95, 0.45, 1.0)
 			if x < 12 and y <= 10:
-				facet_col = Color(0.6, 1.8, 2.2, 1.0)
+				facet_col = Color(0.8, 2.4, 1.3, 1.0)
 			elif x >= 12 and y > 10:
-				facet_col = Color(0.05, 0.5, 0.7, 0.95)
+				facet_col = Color(0.06, 0.55, 0.22, 1.0)
 			if abs(x - 12) <= 1 and abs(y - 10) <= 2:
-				facet_col = Color(2.0, 3.0, 3.5, 1.0)
+				facet_col = Color(2.2, 3.6, 2.4, 1.0)
 
 	return ImageTexture.create_from_image(img)
 

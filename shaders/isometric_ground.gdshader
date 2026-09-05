@@ -1,14 +1,14 @@
 shader_type canvas_item;
 
 // --- COLOR PALETTE & UNIFORMS ---
-uniform vec4 bg_color : source_color = vec4(0.04, 0.05, 0.09, 1.0);
-uniform vec4 line_color : source_color = vec4(0.09, 0.15, 0.28, 0.85);
-uniform vec4 major_line_color : source_color = vec4(0.20, 0.65, 1.40, 1.4); // HDR Plasma Blue
-uniform vec4 border_color : source_color = vec4(0.35, 0.95, 1.80, 1.6);     // HDR Containment Barrier
-uniform vec4 accent_neon_color : source_color = vec4(0.15, 0.85, 1.25, 1.3); // HDR Cyan Neon
-uniform vec4 hazard_color : source_color = vec4(1.4, 0.95, 0.15, 1.0);       // HDR Caution Amber/Yellow
-uniform vec4 vent_glow_color : source_color = vec4(1.6, 0.42, 0.10, 1.2);    // HDR Thermal Orange/Red
-uniform vec4 void_nebula_color : source_color = vec4(0.05, 0.02, 0.12, 1.0); // Deep Space Abyss
+uniform vec4 bg_color : source_color = vec4(0.025, 0.030, 0.045, 1.0);
+uniform vec4 line_color : source_color = vec4(0.06, 0.09, 0.16, 0.55);
+uniform vec4 major_line_color : source_color = vec4(0.12, 0.38, 0.72, 0.85); // Gentle Cyber Blue
+uniform vec4 border_color : source_color = vec4(0.25, 0.70, 1.30, 1.2);     // Containment Barrier
+uniform vec4 accent_neon_color : source_color = vec4(0.10, 0.50, 0.75, 0.8); // Restrained Cyan
+uniform vec4 hazard_color : source_color = vec4(1.0, 0.70, 0.12, 0.8);       // Caution Amber
+uniform vec4 vent_glow_color : source_color = vec4(1.1, 0.30, 0.08, 0.85);   // Warm Under-Floor Glow
+uniform vec4 void_nebula_color : source_color = vec4(0.04, 0.015, 0.09, 1.0); // Deep Space Abyss
 
 uniform float grid_scale : hint_range(16.0, 256.0) = 64.0;
 uniform vec2 arena_size = vec2(10000.0, 10000.0);
@@ -77,8 +77,8 @@ void fragment() {
 	// Isometric light direction (Top-Left key light):
 	// High bevel highlight on top edges (small u, small v)
 	// Ambient shadow on bottom edges (large u, large v)
-	float bevel_highlight = smoothstep(0.08, 0.01, cell_uv.x) * 0.16 + smoothstep(0.08, 0.01, cell_uv.y) * 0.16;
-	float bevel_shadow = smoothstep(0.92, 0.99, cell_uv.x) * 0.22 + smoothstep(0.92, 0.99, cell_uv.y) * 0.22;
+	float bevel_highlight = smoothstep(0.08, 0.01, cell_uv.x) * 0.07 + smoothstep(0.08, 0.01, cell_uv.y) * 0.07;
+	float bevel_shadow = smoothstep(0.92, 0.99, cell_uv.x) * 0.12 + smoothstep(0.92, 0.99, cell_uv.y) * 0.12;
 
 	// Mechanical Corner Rivets/Bolts
 	vec2 rivet_uv = abs(cell_uv - 0.5);
@@ -165,26 +165,26 @@ void fragment() {
 	// Primary Anti-Aliased Grid Line
 	vec2 seam_aa = dist_to_seam / fw;
 	float line_intensity = 1.0 - clamp(min(seam_aa.x, seam_aa.y), 0.0, 1.0);
-	tile_base_col = mix(tile_base_col, line_color, line_intensity * 0.65);
+	tile_base_col = mix(tile_base_col, line_color, line_intensity * 0.45);
 
 	// Major Energy Superhighways (Every 8 tiles)
 	vec2 major_dist = min(fract(iso_coords / 8.0), 1.0 - fract(iso_coords / 8.0));
 	vec2 major_aa = major_dist / (fw / 8.0);
 	float major_line = 1.0 - clamp(min(major_aa.x, major_aa.y), 0.0, 1.0);
 
-	// Traveling Plasma Pulse along major lines
-	float plasma_wave = pow(max(0.0, sin(TIME * 2.8 + (u + v) * 0.4)), 10.0) * 2.6;
-	float plasma_ambient = 0.75 + 0.25 * sin(TIME * 2.0 + (u - v) * 0.2);
+	// Traveling Plasma Pulse along major lines (toned down to comfortable glow)
+	float plasma_wave = pow(max(0.0, sin(TIME * 1.8 + (u + v) * 0.3)), 12.0) * 0.65;
+	float plasma_ambient = 0.55 + 0.15 * sin(TIME * 1.5 + (u - v) * 0.15);
 	vec4 active_major_col = major_line_color * (plasma_ambient + plasma_wave);
-	tile_base_col = mix(tile_base_col, active_major_col, major_line * 0.95);
+	tile_base_col = mix(tile_base_col, active_major_col, major_line * 0.65);
 
 	// Junction Power Nodes at Vertices (where 4 tiles meet)
 	float vertex_dist = length(dist_to_seam);
 	float vertex_node = smoothstep(0.12, 0.02, vertex_dist);
 	if (vertex_node > 0.0) {
-		float node_pulse = 0.8 + 0.3 * sin(TIME * 3.5 + (tile_id.x + tile_id.y) * 0.6);
-		vec3 node_col = mix(accent_neon_color.rgb, major_line_color.rgb, 0.5) * (node_pulse * 1.3);
-		tile_base_col.rgb = mix(tile_base_col.rgb, node_col, vertex_node * 0.92);
+		float node_pulse = 0.6 + 0.2 * sin(TIME * 2.5 + (tile_id.x + tile_id.y) * 0.5);
+		vec3 node_col = mix(accent_neon_color.rgb, major_line_color.rgb, 0.5) * (node_pulse * 0.9);
+		tile_base_col.rgb = mix(tile_base_col.rgb, node_col, vertex_node * 0.65);
 	}
 
 	// -------------------------------------------------------------
@@ -202,13 +202,13 @@ void fragment() {
 	float ring4 = smoothstep(12.0, 0.0, abs(r_iso - 780.0));
 	float all_rings = max(max(ring1, ring2), max(ring3, ring4));
 
-	// Rotating radar beam in central core
+	// Rotating subtle radar beam in central core (dimmed & smoothed)
 	float angle_iso = atan(iso_radial_vec.y, iso_radial_vec.x);
-	float radar_sweep = pow(max(0.0, cos(angle_iso - TIME * 1.5)), 12.0) * step(r_iso, 780.0);
+	float radar_sweep = pow(max(0.0, cos(angle_iso - TIME * 0.7)), 32.0) * step(r_iso, 520.0);
 
 	if (all_rings > 0.0 || radar_sweep > 0.0) {
-		vec3 reactor_glow = accent_neon_color.rgb * (all_rings * 1.5 + radar_sweep * 0.7);
-		tile_base_col.rgb = mix(tile_base_col.rgb, tile_base_col.rgb + reactor_glow, 0.85);
+		vec3 reactor_glow = accent_neon_color.rgb * (all_rings * 0.25 + radar_sweep * 0.08);
+		tile_base_col.rgb += reactor_glow * 0.35;
 	}
 
 	// -------------------------------------------------------------
