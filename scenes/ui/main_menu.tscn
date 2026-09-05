@@ -103,43 +103,33 @@ layout_mode = 2
 theme_override_constants/separation = 14
 
 [node name="BtnPlay" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
-custom_minimum_size = Vector2(340, 52)
+custom_minimum_size = Vector2(400, 56)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 18
-text = "VÀO TRẬN (START)"
+text = ""
 alignment = 0
 
 [node name="BtnHowToPlay" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
-custom_minimum_size = Vector2(340, 48)
+custom_minimum_size = Vector2(400, 56)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.85, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 16
-text = "CẨM NANG SINH TỒN"
+text = ""
 alignment = 0
 
 [node name="BtnSettings" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
-custom_minimum_size = Vector2(340, 48)
+custom_minimum_size = Vector2(400, 56)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.85, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 16
-text = "THIẾT LẬP HỆ THỐNG"
+text = ""
 alignment = 0
 
 [node name="BtnCredits" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
-custom_minimum_size = Vector2(340, 48)
+custom_minimum_size = Vector2(400, 56)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.85, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 16
-text = "DANH THẦN & ĐỘI NGŨ"
+text = ""
 alignment = 0
 
 [node name="BtnQuit" type="Button" parent="Margin/Content/LeftCol/ButtonsVBox"]
-custom_minimum_size = Vector2(340, 48)
+custom_minimum_size = Vector2(400, 56)
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
-theme_override_font_sizes/font_size = 16
-text = "THOÁT RA DESKTOP"
+text = ""
 alignment = 0
 
 [node name="Spacer2" type="Control" parent="Margin/Content/LeftCol"]

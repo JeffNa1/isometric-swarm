@@ -6,6 +6,16 @@
 process_mode = 3
 script = ExtResource("1_hud")
 
+[node name="LowHPOverlay" type="ColorRect" parent="."]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.8, 0, 0, 0.25)
+
 [node name="TopBar" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 10
@@ -133,6 +143,15 @@ offset_top = -60.0
 grow_horizontal = 2
 grow_vertical = 0
 
+[node name="GhostHPBar" type="ProgressBar" parent="BottomBar"]
+layout_mode = 1
+offset_left = 24.0
+offset_top = 15.0
+offset_right = 260.0
+offset_bottom = 42.0
+value = 100.0
+show_percentage = false
+
 [node name="HPBar" type="ProgressBar" parent="BottomBar"]
 layout_mode = 1
 offset_left = 24.0
@@ -152,6 +171,22 @@ grow_vertical = 2
 text = "120 / 120 HP"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="InventoryBox" type="HBoxContainer" parent="BottomBar"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -48.0
+offset_right = 240.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 6
+alignment = 1
 
 [node name="RadarContainer" type="PanelContainer" parent="."]
 anchors_preset = 3
@@ -175,10 +210,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -400.0
-offset_top = -140.0
-offset_right = 400.0
-offset_bottom = 140.0
+offset_left = -440.0
+offset_top = -200.0
+offset_right = 440.0
+offset_bottom = 200.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -195,7 +230,7 @@ horizontal_alignment = 1
 
 [node name="CardContainer" type="HBoxContainer" parent="LevelUpModal/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 16
 alignment = 1
 
 [node name="ChestModal" type="PanelContainer" parent="."]
@@ -204,10 +239,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -440.0
-offset_top = -160.0
-offset_right = 440.0
-offset_bottom = 160.0
+offset_left = -460.0
+offset_top = -180.0
+offset_right = 460.0
+offset_bottom = 180.0
 grow_horizontal = 2
 grow_vertical = 2
 

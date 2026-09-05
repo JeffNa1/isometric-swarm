@@ -24,6 +24,8 @@ func _ready() -> void:
 		t_is_crit.append(false)
 
 func spawn_damage(pos: Vector2, amount: float, is_crit: bool = false) -> void:
+	if not MainMenu.show_damage_numbers:
+		return
 	if active_count >= MAX_TEXTS:
 		return
 
@@ -35,10 +37,10 @@ func spawn_damage(pos: Vector2, amount: float, is_crit: bool = false) -> void:
 
 	if is_crit:
 		t_str[idx] = "⚡%d!" % int(amount)
-		t_color[idx] = Color(1.0, 0.9, 0.2, 1.0) # Gold
+		t_color[idx] = Color(1.0, 0.9, 0.15, 1.0) # Radiant Gold
 	else:
 		t_str[idx] = "%d" % int(amount)
-		t_color[idx] = Color(1.0, 1.0, 1.0, 1.0) # White
+		t_color[idx] = Color(0.95, 0.98, 1.0, 1.0) # Crisp White
 
 	active_count += 1
 
@@ -84,12 +86,21 @@ func _draw() -> void:
 		return
 
 	for i in range(active_count):
-		var alpha = clamp(t_life[i] / 0.55, 0.0, 1.0)
+		var max_l = 1.1 if t_str[i].length() > 6 else 0.55
+		var alpha = clamp(t_life[i] / max_l, 0.0, 1.0)
 		var c = t_color[i]
 		c.a = alpha
-		var font_size = 18 if t_is_crit[i] else 13
+		var base_size = 18 if t_is_crit[i] else 13
 		
-		# Draw subtle black outline shadow
-		var shadow_col = Color(0, 0, 0, alpha * 0.8)
-		draw_string(default_font, t_pos[i] + Vector2(1, 1), t_str[i], HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, shadow_col)
-		draw_string(default_font, t_pos[i], t_str[i], HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, c)
+		# Initial pop bounce
+		var elapsed = max_l - t_life[i]
+		if elapsed < 0.12:
+			base_size = int(base_size * 1.25)
+
+		# 4-way solid black outline for maximum readability
+		var shadow_col = Color(0.01, 0.02, 0.04, alpha * 0.95)
+		draw_string(default_font, t_pos[i] + Vector2(-1, 0), t_str[i], HORIZONTAL_ALIGNMENT_CENTER, -1, base_size, shadow_col)
+		draw_string(default_font, t_pos[i] + Vector2(1, 0), t_str[i], HORIZONTAL_ALIGNMENT_CENTER, -1, base_size, shadow_col)
+		draw_string(default_font, t_pos[i] + Vector2(0, -1), t_str[i], HORIZONTAL_ALIGNMENT_CENTER, -1, base_size, shadow_col)
+		draw_string(default_font, t_pos[i] + Vector2(0, 1), t_str[i], HORIZONTAL_ALIGNMENT_CENTER, -1, base_size, shadow_col)
+		draw_string(default_font, t_pos[i], t_str[i], HORIZONTAL_ALIGNMENT_CENTER, -1, base_size, c)

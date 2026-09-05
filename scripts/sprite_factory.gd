@@ -937,3 +937,333 @@ static func create_menu_icon(icon_name: String) -> ImageTexture:
 
 	return ImageTexture.create_from_image(img)
 
+
+static var _item_icon_cache: Dictionary = {}
+
+static func create_item_icon(item_id: String) -> ImageTexture:
+	if _item_icon_cache.has(item_id):
+		return _item_icon_cache[item_id]
+
+	var w = 32
+	var h = 32
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# Subtle dark cyber-frame background for all icons
+	for y in range(2, 30):
+		for x in range(2, 30):
+			var is_edge = (x == 2 or x == 29 or y == 2 or y == 29)
+			var is_corner = (x <= 3 or x >= 28) and (y <= 3 or y >= 28)
+			if not is_corner:
+				if is_edge:
+					img.set_pixel(x, y, Color(0.18, 0.28, 0.42, 0.8))
+				else:
+					img.set_pixel(x, y, Color(0.04, 0.07, 0.13, 0.75))
+
+	var is_evo = item_id.ends_with("_evo")
+
+	match item_id:
+		"railgun":
+			# Twin heavy rail barrels firing high-energy cyan laser beam
+			for y in range(13, 19):
+				for x in range(5, 27):
+					img.set_pixel(x, y, Color(0.2, 0.35, 0.5, 1.0))
+			# Center high-voltage beam
+			for x in range(3, 29):
+				img.set_pixel(x, 15, Color(1.5, 3.5, 4.0, 1.0))
+				img.set_pixel(x, 16, Color(0.4, 2.5, 3.8, 1.0))
+			# Rail emitters
+			for y in range(11, 21):
+				img.set_pixel(10, y, Color(0.4, 2.5, 3.8, 1.0))
+				img.set_pixel(21, y, Color(0.4, 2.5, 3.8, 1.0))
+
+		"railgun_evo":
+			# Hyperion Tachyon: Dual rainbow tachyon beams with solar crown
+			for x in range(3, 29):
+				img.set_pixel(x, 13, Color(3.8, 0.5, 1.5, 1.0))
+				img.set_pixel(x, 14, Color(3.8, 3.5, 4.0, 1.0))
+				img.set_pixel(x, 17, Color(3.8, 3.5, 4.0, 1.0))
+				img.set_pixel(x, 18, Color(0.3, 2.8, 3.8, 1.0))
+			# Golden power crown
+			for y in range(7, 12):
+				for x in range(8, 24):
+					if y == 7 and (x == 8 or x == 16 or x == 23):
+						img.set_pixel(x, y, Color(3.8, 2.8, 0.5, 1.0))
+					elif y >= 9:
+						img.set_pixel(x, y, Color(2.8, 1.8, 0.3, 1.0))
+
+		"flame":
+			# Plasma flame thrower nozzle spitting conical infernal fire
+			for y in range(12, 20):
+				for x in range(5, 12):
+					img.set_pixel(x, y, Color(0.25, 0.3, 0.38, 1.0))
+			# Nozzle band
+			for y in range(10, 22):
+				img.set_pixel(11, y, Color(3.5, 1.5, 0.2, 1.0))
+			# Flame tongues
+			for x in range(12, 28):
+				var spread = int((x - 12) * 0.65)
+				for y in range(16 - spread, 16 + spread + 1):
+					if y >= 4 and y < 28:
+						var dist_center = abs(y - 16)
+						if dist_center <= 1:
+							img.set_pixel(x, y, Color(3.8, 3.5, 1.0, 1.0))
+						elif dist_center <= spread * 0.5:
+							img.set_pixel(x, y, Color(3.8, 1.8, 0.2, 0.95))
+						else:
+							img.set_pixel(x, y, Color(3.5, 0.4, 0.1, 0.85))
+
+		"flame_evo":
+			# Infernal Sunstorm: 360 degree sunburst spiral
+			var center = Vector2(16, 16)
+			for y in range(5, 27):
+				for x in range(5, 27):
+					var dist = (Vector2(x, y) - center).length()
+					if dist <= 10.0:
+						var ang = atan2(y - 16, x - 16)
+						var spiral = sin(ang * 4.0 + dist * 0.8)
+						if spiral > 0.0 or dist <= 4.0:
+							var col = Color(3.8, 3.5, 1.0, 1.0) if dist <= 4.0 else Color(3.8, 0.8, 0.1, 0.95)
+							img.set_pixel(x, y, col)
+					elif dist <= 12.0 and int(dist * 2.0) % 2 == 0:
+						img.set_pixel(x, y, Color(3.8, 0.2, 0.2, 0.8))
+
+		"shockwave":
+			# Nova shockwave: Central sphere pulsing with concentric energetic rings
+			var center = Vector2(16, 16)
+			for y in range(5, 27):
+				for x in range(5, 27):
+					var dist = (Vector2(x, y) - center).length()
+					if dist <= 4.0:
+						img.set_pixel(x, y, Color(3.5, 3.8, 4.0, 1.0))
+					elif abs(dist - 7.5) <= 1.0:
+						img.set_pixel(x, y, Color(0.4, 2.5, 3.8, 0.95))
+					elif abs(dist - 11.0) <= 0.9:
+						img.set_pixel(x, y, Color(0.2, 1.5, 3.0, 0.75))
+
+		"shockwave_evo":
+			# Supernova Zero: Black hole singularity with accretion disk
+			var center = Vector2(16, 16)
+			for y in range(4, 28):
+				for x in range(4, 28):
+					var dist = (Vector2(x, y) - center).length()
+					if dist <= 3.5:
+						img.set_pixel(x, y, Color(0.02, 0.02, 0.04, 1.0)) # Event horizon
+					elif abs(dist - 6.0) <= 1.5:
+						img.set_pixel(x, y, Color(3.8, 0.6, 1.8, 1.0)) # Violent magenta burst
+					elif abs(dist - 10.5) <= 1.2:
+						img.set_pixel(x, y, Color(3.8, 2.5, 0.4, 0.9)) # Golden accretion flare
+
+		"missile":
+			# Dual micro-missiles with red guidance cones and exhaust fire
+			var m_offsets = [-4, 4]
+			for dy in m_offsets:
+				var cy = 16 + dy
+				# Body
+				for x in range(8, 20):
+					for y in range(cy - 2, cy + 3):
+						img.set_pixel(x, y, Color(0.85, 0.9, 0.95, 1.0))
+				# Red Seeker nosecone
+				for x in range(20, 25):
+					var span = 24 - x
+					for y in range(cy - span, cy + span + 1):
+						img.set_pixel(x, y, Color(3.8, 0.3, 0.3, 1.0))
+				# Wings/Fins
+				for y in range(cy - 4, cy + 5):
+					img.set_pixel(9, y, Color(0.3, 0.4, 0.55, 1.0))
+				# Exhaust flame
+				for x in range(4, 8):
+					img.set_pixel(x, cy, Color(3.8, 2.5, 0.3, 1.0))
+
+		"missile_evo":
+			# Apocalypse Barrage: 4 clustered warheads with nuclear glow
+			var coords = [Vector2(11, 11), Vector2(21, 11), Vector2(11, 21), Vector2(21, 21)]
+			for c in coords:
+				_draw_circle_on_image(img, c, 3.5, Color(3.8, 0.35, 0.4, 1.0))
+				img.set_pixel(int(c.x), int(c.y), Color(3.8, 3.5, 3.0, 1.0))
+			# Center radioactive symbol cross
+			for i in range(13, 19):
+				img.set_pixel(16, i, Color(3.8, 2.8, 0.3, 1.0))
+				img.set_pixel(i, 16, Color(3.8, 2.8, 0.3, 1.0))
+
+		"blade":
+			# Tri-blade orbital energetic shuriken
+			var center = Vector2(16, 16)
+			for i in range(3):
+				var ang = i * TAU / 3.0
+				for step in range(3, 12):
+					var p = center + Vector2(cos(ang), sin(ang)) * step
+					var side = Vector2(-sin(ang), cos(ang)) * (step * 0.35)
+					var p1 = p + side
+					if p1.x >= 0 and p1.x < w and p1.y >= 0 and p1.y < h:
+						img.set_pixel(int(p1.x), int(p1.y), Color(0.3, 2.5, 3.8, 1.0))
+			_draw_circle_on_image(img, center, 3.0, Color(3.5, 3.5, 4.0, 1.0))
+
+		"blade_evo":
+			# Omni-Scythe Vortex: 4 massive glowing magenta scythes
+			var center = Vector2(16, 16)
+			for i in range(4):
+				var ang = i * TAU / 4.0
+				for step in range(4, 13):
+					var p = center + Vector2(cos(ang + step * 0.15), sin(ang + step * 0.15)) * step
+					if p.x >= 0 and p.x < w and p.y >= 0 and p.y < h:
+						img.set_pixel(int(p.x), int(p.y), Color(3.8, 0.4, 1.5, 1.0))
+						var p_inner = p + Vector2(cos(ang), sin(ang))
+						if p_inner.x >= 0 and p_inner.x < w and p_inner.y >= 0 and p_inner.y < h:
+							img.set_pixel(int(p_inner.x), int(p_inner.y), Color(3.8, 2.8, 3.5, 1.0))
+			_draw_circle_on_image(img, center, 3.5, Color(3.8, 2.0, 3.8, 1.0))
+
+		"tesla":
+			# High-voltage Tesla coil top with branching lightning
+			for y in range(16, 26):
+				for x in range(13, 19):
+					img.set_pixel(x, y, Color(0.3, 0.38, 0.5, 1.0))
+			# High-voltage sphere
+			_draw_circle_on_image(img, Vector2(16, 12), 5.0, Color(0.4, 2.8, 3.8, 1.0))
+			img.set_pixel(16, 12, Color(3.8, 3.8, 4.0, 1.0))
+			# Lightning arcs
+			var arcs = [Vector2(7, 7), Vector2(25, 7), Vector2(5, 16), Vector2(27, 16)]
+			for a in arcs:
+				var path = [Vector2(16, 12), (Vector2(16, 12) + a) * 0.5 + Vector2(randf_range(-2, 2), randf_range(-2, 2)), a]
+				for p in path:
+					img.set_pixel(int(p.x), int(p.y), Color(3.8, 3.5, 1.0, 1.0))
+
+		"tesla_evo":
+			# Mjolnir Stormcore: Storm hammer surrounded by furious divine thunder
+			# Hammer head
+			for y in range(8, 16):
+				for x in range(9, 23):
+					img.set_pixel(x, y, Color(0.4, 0.5, 0.65, 1.0))
+					if x == 9 or x == 22 or y == 8 or y == 15:
+						img.set_pixel(x, y, Color(0.8, 2.8, 3.8, 1.0))
+			# Handle
+			for y in range(16, 26):
+				for x in range(14, 18):
+					img.set_pixel(x, y, Color(2.5, 1.8, 0.4, 1.0))
+			# Golden lightning rune in center
+			for i in range(10, 15):
+				img.set_pixel(16, i, Color(3.8, 3.5, 4.0, 1.0))
+
+		"mortar":
+			# Heavy cyber mortar cannon launching green corrosive shell
+			for y in range(14, 25):
+				for x in range(10, 22):
+					var is_barrel = (x - y <= 4 and x - y >= -4)
+					if is_barrel:
+						img.set_pixel(x, y, Color(0.2, 0.35, 0.25, 1.0))
+			# Toxic shell emerging
+			_draw_circle_on_image(img, Vector2(22, 9), 3.5, Color(0.4, 3.5, 0.8, 1.0))
+			img.set_pixel(22, 9, Color(2.5, 3.8, 1.5, 1.0))
+
+		"mortar_evo":
+			# Corrosive Chernobyl: Radioactive quad-mortar with biohazard glow
+			var center = Vector2(16, 16)
+			_draw_circle_on_image(img, center, 8.0, Color(0.1, 0.4, 0.2, 0.95))
+			# Biohazard clover
+			for i in range(3):
+				var ang = i * TAU / 3.0 - PI * 0.5
+				var p = center + Vector2(cos(ang), sin(ang)) * 5.0
+				_draw_circle_on_image(img, p, 3.0, Color(0.5, 3.8, 0.6, 1.0))
+			_draw_circle_on_image(img, center, 2.5, Color(3.8, 3.5, 0.2, 1.0))
+
+		"energy_core":
+			# High-tech cylindrical energy cell with glowing cyan plasma
+			for y in range(7, 25):
+				for x in range(11, 21):
+					img.set_pixel(x, y, Color(0.08, 0.12, 0.2, 1.0))
+					if x == 11 or x == 20 or y == 7 or y == 24:
+						img.set_pixel(x, y, Color(0.5, 0.6, 0.75, 1.0))
+			# Top & bottom terminals
+			for x in range(13, 19):
+				img.set_pixel(x, 5, Color(3.5, 2.5, 0.4, 1.0))
+				img.set_pixel(x, 6, Color(3.5, 2.5, 0.4, 1.0))
+			# Core lightning bolt
+			var bolt = [Vector2(16, 9), Vector2(14, 14), Vector2(18, 14), Vector2(15, 21)]
+			for p in bolt:
+				_draw_circle_on_image(img, p, 1.5, Color(0.4, 3.2, 4.0, 1.0))
+
+		"nano_armor":
+			# Heavy titanium cyber-shield with emerald nanite healing cross
+			for y in range(6, 26):
+				var dy = float(y - 6) / 20.0
+				var half_w = int(lerp(8.0, 1.0, dy * dy))
+				for x in range(16 - half_w, 16 + half_w + 1):
+					var col = Color(0.12, 0.18, 0.25, 1.0)
+					if x == 16 - half_w or x == 16 + half_w or y == 6:
+						col = Color(0.4, 0.7, 0.9, 1.0)
+					img.set_pixel(x, y, col)
+			# Emerald healing cross in center
+			for i in range(12, 20):
+				img.set_pixel(16, i, Color(0.3, 3.5, 0.8, 1.0))
+				img.set_pixel(15, i, Color(0.3, 3.5, 0.8, 1.0))
+			for i in range(13, 19):
+				img.set_pixel(i, 15, Color(0.3, 3.5, 0.8, 1.0))
+				img.set_pixel(i, 16, Color(0.3, 3.5, 0.8, 1.0))
+
+		"thrusters":
+			# Rocket thruster boot with ion drive plume
+			for y in range(8, 20):
+				for x in range(10, 22):
+					img.set_pixel(x, y, Color(0.2, 0.25, 0.35, 1.0))
+					if x == 10 or x == 21 or y == 8:
+						img.set_pixel(x, y, Color(0.5, 0.65, 0.8, 1.0))
+			# Dual nozzle bells
+			for x in range(11, 21):
+				img.set_pixel(x, 20, Color(3.5, 2.0, 0.3, 1.0))
+			# Blue ion flame blast
+			for y in range(21, 28):
+				var span = 27 - y
+				for x in range(16 - span, 16 + span + 1):
+					img.set_pixel(x, y, Color(0.4, 2.8, 3.8, 1.0))
+
+		"magnet":
+			# Horseshoe magnet with red/blue poles and magnetic gem
+			for y in range(7, 22):
+				for x in range(7, 25):
+					var in_outer = (abs(x - 16) <= 9 and y >= 7)
+					var in_inner = (abs(x - 16) <= 4 and y >= 12)
+					if in_outer and not in_inner:
+						var col = Color(3.8, 0.3, 0.3, 1.0) if x < 16 else Color(0.3, 1.8, 3.8, 1.0)
+						if y >= 19:
+							col = Color(0.8, 0.85, 0.9, 1.0) # Metal tips
+						img.set_pixel(x, y, col)
+			# Central floating crystal gem
+			_draw_circle_on_image(img, Vector2(16, 16), 2.5, Color(3.5, 2.8, 0.5, 1.0))
+
+		"amp":
+			# Overclock amplifier CPU chip with gold circuit traces
+			for y in range(9, 23):
+				for x in range(9, 23):
+					img.set_pixel(x, y, Color(0.08, 0.12, 0.16, 1.0))
+					if x == 9 or x == 22 or y == 9 or y == 22:
+						img.set_pixel(x, y, Color(3.5, 2.5, 0.4, 1.0))
+			# Gold pins
+			var pins = [11, 14, 17, 20]
+			for p in pins:
+				img.set_pixel(p, 7, Color(3.5, 2.5, 0.4, 1.0))
+				img.set_pixel(p, 8, Color(3.5, 2.5, 0.4, 1.0))
+				img.set_pixel(p, 23, Color(3.5, 2.5, 0.4, 1.0))
+				img.set_pixel(p, 24, Color(3.5, 2.5, 0.4, 1.0))
+				img.set_pixel(7, p, Color(3.5, 2.5, 0.4, 1.0))
+				img.set_pixel(8, p, Color(3.5, 2.5, 0.4, 1.0))
+				img.set_pixel(23, p, Color(3.5, 2.5, 0.4, 1.0))
+				img.set_pixel(24, p, Color(3.5, 2.5, 0.4, 1.0))
+			# Glowing amplifier core
+			_draw_circle_on_image(img, Vector2(16, 16), 3.0, Color(3.8, 1.0, 0.3, 1.0))
+
+		_:
+			# Default glowing power orb
+			_draw_circle_on_image(img, Vector2(16, 16), 6.0, Color(0.3, 2.5, 3.8, 1.0))
+
+	# If evolution, overlay a subtle golden laurel corner badge
+	if is_evo:
+		for y in range(3, 7):
+			for x in range(3, 7):
+				if (x + y) % 2 == 0:
+					img.set_pixel(x, y, Color(3.8, 3.0, 0.6, 1.0))
+					img.set_pixel(31 - x, y, Color(3.8, 3.0, 0.6, 1.0))
+
+	var tex = ImageTexture.create_from_image(img)
+	_item_icon_cache[item_id] = tex
+	return tex
+
