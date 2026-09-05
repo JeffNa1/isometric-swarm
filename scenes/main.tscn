@@ -13,9 +13,9 @@
 [sub_resource type="Environment" id="Environment_glow"]
 background_mode = 3
 glow_enabled = true
-glow_intensity = 0.85
-glow_strength = 1.05
-glow_bloom = 0.22
+glow_intensity = 0.95
+glow_strength = 1.08
+glow_bloom = 0.28
 glow_blend_mode = 0
 tonemap_mode = 2
 

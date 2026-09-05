@@ -1750,4 +1750,161 @@ static func create_close_btn_texture(is_hover: bool = false) -> ImageTexture:
 	_btn_cache[key] = tex
 	return tex
 
+static func create_steam_vent_texture() -> ImageTexture:
+	var w = 48
+	var h = 28
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# Isometric diamond plate on floor
+	for y in range(h):
+		for x in range(w):
+			# Map to 2:1 diamond coords
+			var dx = abs(float(x - 24) / 22.0)
+			var dy = abs(float(y - 14) / 12.0)
+			if (dx + dy) <= 1.0:
+				var rim = (dx + dy) >= 0.82
+				var col = Color(0.22, 0.26, 0.35, 1.0) if rim else Color(0.04, 0.05, 0.08, 1.0)
+				# 3D edge highlight
+				if rim and y < 14:
+					col = Color(0.45, 0.55, 0.72, 1.0)
+				elif rim and y >= 14:
+					col = Color(0.12, 0.15, 0.22, 1.0)
+				
+				# Grate slats
+				if not rim and (x % 4 == 0 or x % 4 == 1):
+					col = Color(0.18, 0.22, 0.28, 1.0)
+				# Thermal sub-glow
+				if not rim and (x % 4 == 2):
+					col = Color(1.6, 0.45, 0.1, 0.85)
+
+				img.set_pixel(x, y, col)
+
+	# 4 Corner hex bolts
+	var bolts = [Vector2(24, 3), Vector2(24, 25), Vector2(5, 14), Vector2(43, 14)]
+	for b in bolts:
+		img.set_pixel(int(b.x), int(b.y), Color(0.65, 0.75, 0.9, 1.0))
+
+	return ImageTexture.create_from_image(img)
+
+static func create_generator_texture() -> ImageTexture:
+	var w = 64
+	var h = 112
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# 1. Base Ground Shadow (Isometric Ellipse)
+	for sy in range(88, 110):
+		for sx in range(12, 52):
+			var norm_x = float(sx - 32) / 18.0
+			var norm_y = float(sy - 98) / 9.0
+			if (norm_x * norm_x + norm_y * norm_y) <= 1.0:
+				var alpha = 0.52 * (1.0 - (norm_x * norm_x + norm_y * norm_y))
+				img.set_pixel(sx, sy, Color(0.0, 0.0, 0.0, alpha))
+
+	# 2. Base Pedestal with Hazard Chevrons (y=80..96)
+	for y in range(80, 96):
+		var t = float(y - 80) / 16.0
+		var half_w = 18.0 + t * 4.0
+		var min_x = int(32.0 - half_w)
+		var max_x = int(32.0 + half_w)
+		for x in range(min_x, max_x + 1):
+			var is_stripe = ((x + y) / 5) % 2 == 0
+			var col = Color(1.5, 1.0, 0.15, 1.0) if is_stripe else Color(0.1, 0.11, 0.14, 1.0)
+			if x == min_x or y == 80:
+				col = col * 1.3
+			img.set_pixel(x, y, col)
+
+	# 3. Main Reactor Column (y=32..80)
+	for y in range(32, 80):
+		var t = float(y - 32) / 48.0
+		var half_w = 14.0
+		var min_x = int(32.0 - half_w)
+		var max_x = int(32.0 + half_w)
+		for x in range(min_x, max_x + 1):
+			var norm_x = float(x - 32) / half_w
+			var col = Color(0.18, 0.22, 0.28, 1.0)
+			if norm_x < -0.7:
+				col = Color(0.38, 0.46, 0.58, 1.0)
+			elif norm_x > 0.65:
+				col = Color(0.08, 0.10, 0.14, 1.0)
+
+			# Central Core Glass Tube (x in 26..38)
+			if x >= 26 and x <= 38:
+				var core_x = float(x - 32) / 6.0
+				var plasma = 1.0 - abs(core_x)
+				var pulse = 0.8 + 0.3 * sin(float(y) * 0.4)
+				col = Color(0.2 * pulse, 2.2 * pulse, 3.8 * pulse, 1.0) * plasma
+				if abs(core_x) < 0.3:
+					col = Color(2.5, 3.5, 5.0, 1.0) # White-hot plasma core
+
+			img.set_pixel(x, y, col)
+
+	# 4. Twin Side Tesla Coils (Windings)
+	for y in range(40, 72):
+		if y % 4 == 0 or y % 4 == 1:
+			for x in range(12, 18):
+				img.set_pixel(x, y, Color(1.4, 0.7, 0.2, 1.0)) # Copper coil
+			for x in range(46, 52):
+				img.set_pixel(x, y, Color(1.4, 0.7, 0.2, 1.0))
+
+	# 5. Top Dome & High-Voltage Electrode Sphere (y=10..32)
+	for y in range(16, 32):
+		var dy = float(y - 24) / 8.0
+		var r = sqrt(max(0.0, 1.0 - dy * dy)) * 12.0
+		var min_x = int(32.0 - r)
+		var max_x = int(32.0 + r)
+		for x in range(min_x, max_x + 1):
+			var norm_x = float(x - 32) / 12.0
+			var col = Color(0.25, 0.30, 0.38, 1.0)
+			if norm_x < -0.4:
+				col = Color(0.55, 0.65, 0.80, 1.0)
+			img.set_pixel(x, y, col)
+
+	# Glowing Apex Lightning Rod (y=4..16)
+	for y in range(4, 16):
+		img.set_pixel(32, y, Color(0.3, 2.5, 4.0, 1.0))
+		img.set_pixel(31, y, Color(0.2, 1.5, 2.8, 1.0))
+		img.set_pixel(33, y, Color(0.2, 1.5, 2.8, 1.0))
+	img.set_pixel(32, 3, Color(3.5, 4.5, 6.0, 1.0))
+
+	return ImageTexture.create_from_image(img)
+
+static func create_hazard_barrier_texture() -> ImageTexture:
+	var w = 56
+	var h = 36
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# Shadow
+	for sy in range(24, 34):
+		for sx in range(6, 50):
+			var norm = float(sx - 28) / 22.0
+			if abs(norm) <= 1.0:
+				img.set_pixel(sx, sy, Color(0.0, 0.0, 0.0, 0.4 * (1.0 - abs(norm))))
+
+	# Heavy Barricade Beam with Hazard Chevrons (y=10..24)
+	for y in range(10, 24):
+		for x in range(8, 48):
+			var stripe = ((x * 2 + y) / 6) % 2 == 0
+			var col = Color(1.5, 1.0, 0.15, 1.0) if stripe else Color(0.12, 0.14, 0.18, 1.0)
+			if y == 10: col = col * 1.3
+			if y == 23: col = Color(0.05, 0.06, 0.08, 1.0)
+			img.set_pixel(x, y, col)
+
+	# Twin Industrial Support Legs
+	for y in range(18, 30):
+		for x in range(12, 16):
+			img.set_pixel(x, y, Color(0.25, 0.3, 0.38, 1.0))
+		for x in range(40, 44):
+			img.set_pixel(x, y, Color(0.25, 0.3, 0.38, 1.0))
+
+	# Amber Warning Strobe Beacon on top
+	for y in range(3, 9):
+		for x in range(26, 30):
+			img.set_pixel(x, y, Color(1.8, 0.9, 0.1, 1.0))
+	img.set_pixel(28, 2, Color(3.5, 2.5, 0.8, 1.0))
+
+	return ImageTexture.create_from_image(img)
+
 
