@@ -19,6 +19,8 @@ var particle_mgr: Node2D = null
 static var pool_tex: ImageTexture = null
 
 func _ready() -> void:
+	z_as_relative = false
+	z_index = 1 # Ground layer: strictly beneath SwarmManager (z_index = 3)
 	if not pool_tex:
 		pool_tex = SpriteFactory.create_acid_pool_texture()
 	_get_managers()

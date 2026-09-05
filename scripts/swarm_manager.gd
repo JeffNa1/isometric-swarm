@@ -36,6 +36,8 @@ signal enemy_killed(xp_val: int, pos: Vector2, is_boss: bool)
 signal swarm_count_changed(count: int)
 
 func _ready() -> void:
+	z_as_relative = false
+	z_index = 3 # Render strictly above ground decals/blood (z=1), below air FX (z=4) and player (z=5)
 	_init_multimeshes()
 	_allocate_arrays()
 	_get_managers()

@@ -9,12 +9,22 @@ var p_life: PackedFloat32Array = PackedFloat32Array()
 var p_max_life: PackedFloat32Array = PackedFloat32Array()
 var p_size: PackedFloat32Array = PackedFloat32Array()
 var p_growth: PackedFloat32Array = PackedFloat32Array() # growth rate in pixels/sec
-var p_type: PackedInt32Array = PackedInt32Array() # 0: Circle, 1: Shard/Line, 2: Shockwave Ring
+var p_type: PackedInt32Array = PackedInt32Array() # 0: Blood drop, 1: Shard, 2: Shockwave, 3: Ground Decal, 4: Spark/Air
 
 var active_count: int = 0
+var ground_canvas: Node2D = null
 
 func _ready() -> void:
-	z_index = 5 # render above ground, below HUD
+	z_as_relative = false
+	z_index = 4 # Air particles: sparks, muzzle flare, smoke, high-velocity shards
+
+	ground_canvas = Node2D.new()
+	ground_canvas.name = "GroundDecals"
+	ground_canvas.z_as_relative = false
+	ground_canvas.z_index = 1 # Ground layer: strictly beneath SwarmManager (z_index = 3)
+	ground_canvas.draw.connect(_on_ground_draw)
+	add_child(ground_canvas)
+
 	p_pos.resize(MAX_PARTICLES)
 	p_vel.resize(MAX_PARTICLES)
 	p_color.resize(MAX_PARTICLES)
@@ -37,6 +47,7 @@ func spawn_blood_burst(center: Vector2, col: Color, count: int = 14) -> void:
 		p_max_life[idx] = p_life[idx]
 		p_size[idx] = randf_range(3.0, 5.0)
 		p_growth[idx] = -3.0
+		p_type[idx] = 0 # Blood drop on floor
 		active_count += 1
 
 func spawn_directional_blood(center: Vector2, dir: Vector2, col: Color, count: int = 12) -> void:
@@ -53,6 +64,7 @@ func spawn_directional_blood(center: Vector2, dir: Vector2, col: Color, count: i
 		p_max_life[idx] = p_life[idx]
 		p_size[idx] = randf_range(3.0, 5.5)
 		p_growth[idx] = -2.5
+		p_type[idx] = 0 # Blood drop on floor
 		active_count += 1
 
 func spawn_sparks(center: Vector2, col: Color, count: int = 10) -> void:
@@ -68,6 +80,7 @@ func spawn_sparks(center: Vector2, col: Color, count: int = 10) -> void:
 		p_max_life[idx] = p_life[idx]
 		p_size[idx] = randf_range(2.0, 3.8)
 		p_growth[idx] = -4.0
+		p_type[idx] = 4 # Air spark
 		active_count += 1
 
 func spawn_muzzle_flare(center: Vector2, dir: Vector2, col: Color) -> void:
@@ -85,6 +98,7 @@ func spawn_muzzle_flare(center: Vector2, dir: Vector2, col: Color) -> void:
 		p_max_life[idx] = p_life[idx]
 		p_size[idx] = randf_range(2.5, 4.5)
 		p_growth[idx] = -5.0
+		p_type[idx] = 4 # Air spark
 		active_count += 1
 
 func spawn_flame_puff(center: Vector2, vel: Vector2, col: Color, init_size: float = 6.0) -> void:
@@ -97,6 +111,7 @@ func spawn_flame_puff(center: Vector2, vel: Vector2, col: Color, init_size: floa
 	p_max_life[idx] = p_life[idx]
 	p_size[idx] = init_size
 	p_growth[idx] = 32.0 # Expanding fireball
+	p_type[idx] = 4 # Air flame
 	active_count += 1
 
 func spawn_smoke_trail(center: Vector2, vel: Vector2, col: Color) -> void:
@@ -109,6 +124,7 @@ func spawn_smoke_trail(center: Vector2, vel: Vector2, col: Color) -> void:
 	p_max_life[idx] = p_life[idx]
 	p_size[idx] = randf_range(3.0, 5.0)
 	p_growth[idx] = 12.0 # Gently expanding smoke
+	p_type[idx] = 4 # Air smoke
 	active_count += 1
 
 func spawn_scorch_mark(center: Vector2, col: Color) -> void:
@@ -121,6 +137,7 @@ func spawn_scorch_mark(center: Vector2, col: Color) -> void:
 	p_max_life[idx] = p_life[idx]
 	p_size[idx] = randf_range(5.0, 9.0)
 	p_growth[idx] = -2.0
+	p_type[idx] = 3 # Ground scorch decal
 	active_count += 1
 
 func spawn_shockwave_debris(center: Vector2, radius: float, count: int = 18) -> void:
@@ -136,6 +153,7 @@ func spawn_shockwave_debris(center: Vector2, radius: float, count: int = 18) -> 
 		p_max_life[idx] = p_life[idx]
 		p_size[idx] = randf_range(2.5, 4.5)
 		p_growth[idx] = -3.0
+		p_type[idx] = 4 # Air debris
 		active_count += 1
 
 func spawn_chitin_shards(center: Vector2, col: Color, count: int = 14) -> void:
@@ -151,7 +169,7 @@ func spawn_chitin_shards(center: Vector2, col: Color, count: int = 14) -> void:
 		p_max_life[idx] = p_life[idx]
 		p_size[idx] = randf_range(3.0, 6.0)
 		p_growth[idx] = -4.0
-		p_type[idx] = 1 # Shard
+		p_type[idx] = 1 # Shard in air
 		active_count += 1
 
 func spawn_shockwave_ring(center: Vector2, col: Color, max_radius: float = 42.0) -> void:
@@ -164,7 +182,7 @@ func spawn_shockwave_ring(center: Vector2, col: Color, max_radius: float = 42.0)
 	p_max_life[idx] = 0.22
 	p_size[idx] = 4.0
 	p_growth[idx] = max_radius / 0.22 # expand to max radius
-	p_type[idx] = 2 # Shockwave ring
+	p_type[idx] = 2 # Shockwave ring in air
 	active_count += 1
 
 func spawn_ground_splatter(center: Vector2, col: Color) -> void:
@@ -177,7 +195,7 @@ func spawn_ground_splatter(center: Vector2, col: Color) -> void:
 	p_max_life[idx] = p_life[idx]
 	p_size[idx] = randf_range(8.0, 16.0)
 	p_growth[idx] = 0.0
-	p_type[idx] = 3 # Ground splatter
+	p_type[idx] = 3 # Ground splatter decal
 	active_count += 1
 
 func _process(delta: float) -> void:
@@ -207,24 +225,43 @@ func _process(delta: float) -> void:
 			i += 1
 
 	queue_redraw()
+	if is_instance_valid(ground_canvas):
+		ground_canvas.queue_redraw()
+
+func _on_ground_draw() -> void:
+	if not is_instance_valid(ground_canvas):
+		return
+	for i in range(active_count):
+		var ptype = p_type[i]
+		if ptype == 0 or ptype == 3:
+			var alpha = clamp(p_life[i] / p_max_life[i], 0.0, 1.0)
+			var c = p_color[i]
+			c.a *= alpha
+			if ptype == 3:
+				# Isometric flattened splatter decal strictly on ground
+				ground_canvas.draw_set_transform(p_pos[i], 0.0, Vector2(1.0, 0.5))
+				ground_canvas.draw_circle(Vector2.ZERO, p_size[i], c)
+				ground_canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			else:
+				# Blood drop on floor
+				ground_canvas.draw_set_transform(p_pos[i], 0.0, Vector2(1.0, 0.6))
+				ground_canvas.draw_circle(Vector2.ZERO, p_size[i], c)
+				ground_canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw() -> void:
 	for i in range(active_count):
-		var alpha = clamp(p_life[i] / p_max_life[i], 0.0, 1.0)
-		var c = p_color[i]
-		c.a *= alpha
-
 		var ptype = p_type[i]
-		match ptype:
-			1: # Shard
-				var v_norm = p_vel[i].normalized()
-				var trail_len = min(14.0, p_vel[i].length() * 0.035)
-				draw_line(p_pos[i] - v_norm * trail_len, p_pos[i], c, p_size[i] * 0.75)
-			2: # Shockwave ring
-				draw_arc(p_pos[i], p_size[i], 0.0, TAU, 16, c, 2.5)
-			3: # Ground splatter
-				draw_set_transform(p_pos[i], 0.0, Vector2(1.0, 0.5))
-				draw_circle(Vector2.ZERO, p_size[i], c)
-				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-			_: # Default circle
-				draw_circle(p_pos[i], p_size[i], c)
+		if ptype != 0 and ptype != 3:
+			var alpha = clamp(p_life[i] / p_max_life[i], 0.0, 1.0)
+			var c = p_color[i]
+			c.a *= alpha
+
+			match ptype:
+				1: # Shard
+					var v_norm = p_vel[i].normalized()
+					var trail_len = min(14.0, p_vel[i].length() * 0.035)
+					draw_line(p_pos[i] - v_norm * trail_len, p_pos[i], c, p_size[i] * 0.75)
+				2: # Shockwave ring
+					draw_arc(p_pos[i], p_size[i], 0.0, TAU, 16, c, 2.5)
+				_: # Default air circle (sparks, flame, smoke, debris)
+					draw_circle(p_pos[i], p_size[i], c)
