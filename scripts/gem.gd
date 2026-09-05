@@ -18,6 +18,7 @@ func _ready() -> void:
 		gem_tex = SpriteFactory.create_gem_texture()
 	collision_layer = 8
 	collision_mask = 0
+	add_to_group("gems")
 	queue_redraw()
 
 func _process(delta: float) -> void:

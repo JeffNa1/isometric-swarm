@@ -2,6 +2,8 @@ extends Node2D
 
 const PylonScene = preload("res://scenes/pylon.tscn")
 const GemScene = preload("res://scenes/gem.tscn")
+const CrateScene = preload("res://scenes/crate.tscn")
+const BossScene = preload("res://scenes/boss.tscn")
 
 @onready var arena: Node2D = $Arena
 @onready var swarm_mgr: Node2D = $SwarmManager
@@ -20,11 +22,13 @@ var spawn_timer: float = 0.0
 var surge_triggered: bool = false
 var titans_triggered: bool = false
 var apocalypse_triggered: bool = false
+var boss_spawned: bool = false
 
 func _ready() -> void:
 	_setup_inputs_if_needed()
 	_connect_signals()
 	_spawn_pylons()
+	_spawn_crates()
 	# Scrappy Start: Trickle in only 10 initial crawlers
 	_spawn_initial_horde()
 
@@ -44,6 +48,31 @@ func _spawn_pylons() -> void:
 				break
 		pylon.position = p_pos
 		pylons_container.add_child(pylon)
+
+func _spawn_crates() -> void:
+	if not entities_container:
+		return
+	var count = 65
+	for i in range(count):
+		var crate = CrateScene.instantiate()
+		var c_pos = Vector2.ZERO
+		while true:
+			c_pos = Vector2(
+				randf_range(-4400.0, 4400.0),
+				randf_range(-4400.0, 4400.0)
+			)
+			if c_pos.length() > 250.0:
+				break
+		crate.position = c_pos
+		entities_container.add_child(crate)
+
+func vacuum_all_gems() -> void:
+	if not is_instance_valid(player):
+		return
+	var gems = get_tree().get_nodes_in_group("gems")
+	for g in gems:
+		if is_instance_valid(g) and g.has_method("attract_to"):
+			g.attract_to(player)
 
 func _setup_inputs_if_needed() -> void:
 	var bindings = {
@@ -133,8 +162,12 @@ func _process_spawn_director(delta: float) -> void:
 				var e_type = 2 if roll < 0.12 else (1 if roll < 0.4 else 0)
 				_spawn_wave_cluster(randi_range(40, 75), e_type)
 
-	# Phase 5: 05:00+ | Apocalyptic Swarm (Extreme density)
+	# Phase 5: 05:00+ | Apocalyptic Swarm & Apex Leviathan Boss
 	else:
+		if not boss_spawned:
+			boss_spawned = true
+			_spawn_boss()
+
 		if not apocalypse_triggered:
 			apocalypse_triggered = true
 			if hud.has_method("show_surge_warning"):
@@ -148,6 +181,20 @@ func _process_spawn_director(delta: float) -> void:
 				var roll = randf()
 				var e_type = 2 if roll < 0.18 else (1 if roll < 0.45 else 0)
 				_spawn_wave_cluster(randi_range(60, 110), e_type)
+
+func _spawn_boss() -> void:
+	if not entities_container or not is_instance_valid(player):
+		return
+	if sound_mgr and sound_mgr.has_method("play_alarm"):
+		sound_mgr.play_alarm()
+	if hud and hud.has_method("show_surge_warning"):
+		hud.show_surge_warning("💀 BÁ CHỦ VỰC THẲM: APEX LEVIATHAN ĐÃ XUẤT HIỆN! 💀")
+	if camera and camera.has_method("add_trauma"):
+		camera.add_trauma(0.65)
+
+	var boss = BossScene.instantiate()
+	boss.global_position = player.global_position + Vector2(650.0, -100.0)
+	entities_container.add_child(boss)
 
 func _trigger_swarm_surge() -> void:
 	if sound_mgr and sound_mgr.has_method("play_alarm"):

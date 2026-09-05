@@ -251,6 +251,17 @@ func damage_in_radius(center: Vector2, radius: float, damage: float, knockback: 
 				var knock_dir = diff.normalized()
 				_apply_damage_to_index(idx, damage, knock_dir * knockback, true)
 				hit_count += 1
+
+	for b in get_tree().get_nodes_in_group("boss"):
+		if is_instance_valid(b) and b.has_method("take_damage"):
+			if b.global_position.distance_to(center) <= (radius + 34.0):
+				b.take_damage(damage)
+
+	for c in get_tree().get_nodes_in_group("crates"):
+		if is_instance_valid(c) and c.has_method("take_damage"):
+			if c.global_position.distance_to(center) <= (radius + 20.0):
+				c.take_damage(damage)
+
 	return hit_count
 
 func damage_along_beam(start: Vector2, end: Vector2, width: float, damage: float, knockback: float) -> int:
@@ -278,6 +289,23 @@ func damage_along_beam(start: Vector2, end: Vector2, width: float, damage: float
 				if perp_dist <= (half_width + radii[idx]):
 					_apply_damage_to_index(idx, damage, beam_dir * knockback, randf() < 0.25)
 					hit_count += 1
+
+	for b in get_tree().get_nodes_in_group("boss"):
+		if is_instance_valid(b) and b.has_method("take_damage"):
+			var to_b = b.global_position - start
+			var proj = to_b.dot(beam_dir)
+			if proj >= 0.0 and proj <= beam_len:
+				if abs(to_b.cross(beam_dir)) <= (half_width + 34.0):
+					b.take_damage(damage)
+
+	for c in get_tree().get_nodes_in_group("crates"):
+		if is_instance_valid(c) and c.has_method("take_damage"):
+			var to_c = c.global_position - start
+			var proj = to_c.dot(beam_dir)
+			if proj >= 0.0 and proj <= beam_len:
+				if abs(to_c.cross(beam_dir)) <= (half_width + 20.0):
+					c.take_damage(damage)
+
 	return hit_count
 
 func damage_in_cone(origin: Vector2, direction: Vector2, max_dist: float, angle_deg: float, damage: float) -> int:
@@ -298,7 +326,44 @@ func damage_in_cone(origin: Vector2, direction: Vector2, max_dist: float, angle_
 				if to_norm.dot(norm_dir) >= min_dot:
 					_apply_damage_to_index(idx, damage, to_norm * 90.0, false)
 					hit_count += 1
+
+	for b in get_tree().get_nodes_in_group("boss"):
+		if is_instance_valid(b) and b.has_method("take_damage"):
+			var diff = b.global_position - origin
+			if diff.length_squared() <= max_dist_sq:
+				if diff.normalized().dot(norm_dir) >= min_dot:
+					b.take_damage(damage)
+
+	for c in get_tree().get_nodes_in_group("crates"):
+		if is_instance_valid(c) and c.has_method("take_damage"):
+			var diff = c.global_position - origin
+			if diff.length_squared() <= max_dist_sq:
+				if diff.normalized().dot(norm_dir) >= min_dot:
+					c.take_damage(damage)
+
 	return hit_count
+
+func nuke_screen(center: Vector2, radius: float = 1600.0) -> int:
+	var count = 0
+	var rad_sq = radius * radius
+	for i in range(active_count - 1, -1, -1):
+		if i < active_count:
+			var diff = positions[i] - center
+			if diff.length_squared() <= rad_sq:
+				_kill_enemy(i)
+				count += 1
+
+	for b in get_tree().get_nodes_in_group("boss"):
+		if is_instance_valid(b) and b.has_method("take_damage"):
+			if b.global_position.distance_to(center) <= radius:
+				b.take_damage(1200.0)
+
+	for c in get_tree().get_nodes_in_group("crates"):
+		if is_instance_valid(c) and c.has_method("take_damage"):
+			if c.global_position.distance_to(center) <= radius:
+				c.take_damage(100.0)
+
+	return count
 
 func _apply_damage_to_index(idx: int, dmg: float, knock: Vector2, is_crit: bool = false) -> void:
 	if idx >= active_count:

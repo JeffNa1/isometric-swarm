@@ -89,6 +89,40 @@ text = "BẦY QUÁI: 0 CON"
 horizontal_alignment = 2
 vertical_alignment = 1
 
+[node name="BossContainer" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -320.0
+offset_top = 58.0
+offset_right = 320.0
+offset_bottom = 92.0
+grow_horizontal = 2
+
+[node name="BossHPBar" type="ProgressBar" parent="BossContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+value = 100.0
+show_percentage = false
+
+[node name="BossLabel" type="Label" parent="BossContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.2, 1)
+theme_override_font_sizes/font_size = 14
+text = "APEX LEVIATHAN - 4500 / 4500 HP"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="BottomBar" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 12
@@ -163,6 +197,49 @@ horizontal_alignment = 1
 layout_mode = 2
 theme_override_constants/separation = 14
 alignment = 1
+
+[node name="ChestModal" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -440.0
+offset_top = -160.0
+offset_right = 440.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="ChestModal"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="ChestModal/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.15, 1)
+theme_override_font_sizes/font_size = 26
+text = "👑 RƯƠNG VÀNG THẦN THOẠI - JACKPOT! 👑"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="ChestModal/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 1, 0.9, 1)
+theme_override_font_sizes/font_size = 15
+text = "HẠ GỤC BÁ CHỦ! BẠN ĐƯỢC NHẬN TOÀN BỘ CÁC NÂNG CẤP DƯỚI ĐÂY:"
+horizontal_alignment = 1
+
+[node name="RewardsContainer" type="HBoxContainer" parent="ChestModal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="ClaimButton" type="Button" parent="ChestModal/VBox"]
+custom_minimum_size = Vector2(220, 48)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 18
+text = "🎰 BÚ NGAY CHIẾN LỢI PHẨM!"
 
 [node name="GameOverModal" type="PanelContainer" parent="."]
 anchors_preset = 8

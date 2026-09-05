@@ -473,9 +473,238 @@ static func create_gem_texture() -> ImageTexture:
 			if abs(x - 12) <= 1 and abs(y - 10) <= 2:
 				facet_col = Color(2.0, 3.0, 3.5, 1.0)
 
-			img.set_pixel(x, y, facet_col)
+	return ImageTexture.create_from_image(img)
+
+
+static func create_crate_texture() -> ImageTexture:
+	var w = 32
+	var h = 32
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# 1. Ground Shadow
+	for y in range(24, 30):
+		for x in range(4, 28):
+			var dx = (x - 16.0) / 11.0
+			var dy = (y - 27.0) / 2.5
+			if dx * dx + dy * dy <= 1.0:
+				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.45))
+
+	# 2. Metal Box Body
+	for y in range(8, 26):
+		for x in range(6, 26):
+			var col = Color(0.18, 0.22, 0.28, 1.0)
+			# Metallic beveled edges
+			if x == 6 or y == 8: col = Color(0.45, 0.52, 0.62, 1.0)
+			elif x == 25 or y == 25: col = Color(0.1, 0.12, 0.16, 1.0)
+			# Corner rivets
+			if (x == 8 or x == 23) and (y == 10 or y == 23):
+				col = Color(0.7, 0.75, 0.85, 1.0)
+			# Yellow/Black hazard stripe across middle
+			if y >= 15 and y <= 19:
+				var stripe = ((x + y) % 6 < 3)
+				col = Color(1.8, 1.4, 0.1, 1.0) if stripe else Color(0.12, 0.12, 0.14, 1.0)
+			# Central cyan electronic lock
+			if abs(x - 16) <= 1 and abs(y - 17) <= 1:
+				col = Color(0.3, 2.5, 3.5, 1.0)
+			img.set_pixel(x, y, col)
 
 	return ImageTexture.create_from_image(img)
+
+
+static func create_pickup_texture(pickup_type: int) -> ImageTexture:
+	var w = 24
+	var h = 24
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# Ground shadow
+	for y in range(18, 23):
+		for x in range(6, 18):
+			var dx = (x - 12.0) / 5.0
+			var dy = (y - 20.0) / 2.0
+			if dx * dx + dy * dy <= 1.0:
+				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.35))
+
+	match pickup_type:
+		0: # 0: EMP Nuke (Hazard warhead with lightning)
+			for y in range(4, 18):
+				for x in range(5, 19):
+					var dist = Vector2(x - 12, y - 11).length()
+					if dist <= 6.5:
+						var col = Color(0.15, 0.7, 1.5, 0.95)
+						# Trefoil / lightning symbol in center
+						if abs(x - 12) <= 1 or abs(y - 11) <= 1 or dist < 2.5:
+							col = Color(3.5, 3.5, 4.0, 1.0)
+						img.set_pixel(x, y, col)
+		1: # 1: Quantum Vacuum (Swirling purple singularity)
+			for y in range(4, 18):
+				for x in range(5, 19):
+					var dist = Vector2(x - 12, y - 11).length()
+					if dist <= 6.5:
+						var col = Color(1.4, 0.3, 1.8, 0.9)
+						if dist <= 3.0: col = Color(3.0, 1.2, 3.5, 1.0)
+						if dist <= 1.2: col = Color(0.1, 0.05, 0.15, 1.0) # Black hole center
+						img.set_pixel(x, y, col)
+		2: # 2: Medkit (White capsule with green cross)
+			for y in range(5, 17):
+				for x in range(6, 18):
+					var col = Color(0.9, 0.92, 0.95, 1.0)
+					if x == 6 or y == 5: col = Color(1.0, 1.0, 1.0, 1.0)
+					# Green cross
+					if (abs(x - 12) <= 1 and y >= 7 and y <= 15) or (abs(y - 11) <= 1 and x >= 8 and x <= 16):
+						col = Color(0.2, 2.5, 0.8, 1.0)
+					img.set_pixel(x, y, col)
+		3: # 3: Overclock (Turbo lightning gear)
+			for y in range(4, 18):
+				for x in range(5, 19):
+					var dist = Vector2(x - 12, y - 11).length()
+					if dist <= 6.5:
+						var col = Color(2.8, 1.6, 0.1, 0.95)
+						if abs((x - 12) - (y - 11) * 0.7) <= 1.2:
+							col = Color(3.5, 3.5, 1.0, 1.0)
+						img.set_pixel(x, y, col)
+		_: # 4: Nano Gold Coin
+			for y in range(5, 17):
+				for x in range(6, 18):
+					var dist = Vector2(x - 12, y - 11).length()
+					if dist <= 5.5:
+						var col = Color(2.5, 1.8, 0.2, 1.0)
+						if dist <= 3.0: col = Color(3.2, 2.4, 0.6, 1.0)
+						if x == 10 and y == 9: col = Color(3.5, 3.5, 3.0, 1.0)
+						img.set_pixel(x, y, col)
+
+	return ImageTexture.create_from_image(img)
+
+
+static func create_chest_texture() -> ImageTexture:
+	var w = 40
+	var h = 40
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# 1. Ground Shadow
+	for y in range(30, 38):
+		for x in range(6, 34):
+			var dx = (x - 20.0) / 13.0
+			var dy = (y - 34.0) / 3.0
+			if dx * dx + dy * dy <= 1.0:
+				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.5))
+
+	# 2. Golden Cyber Chest
+	for y in range(12, 32):
+		for x in range(8, 32):
+			var col = Color(1.8, 1.3, 0.15, 1.0) # Rich Gold
+			if x == 8 or y == 12: col = Color(2.5, 2.0, 0.6, 1.0) # Bevel
+			elif x == 31 or y == 31: col = Color(0.8, 0.55, 0.05, 1.0) # Shade
+
+			# Chest lid seam
+			if y == 20: col = Color(0.2, 0.15, 0.05, 1.0)
+			# Cyan power inlays
+			if (x == 11 or x == 28) or (y == 15 and x >= 11 and x <= 28):
+				col = Color(0.3, 2.5, 3.5, 1.0)
+			# Central glowing lock
+			if abs(x - 20) <= 2 and abs(y - 21) <= 2:
+				col = Color(3.5, 3.5, 4.0, 1.0)
+			img.set_pixel(x, y, col)
+
+	return ImageTexture.create_from_image(img)
+
+
+static func create_boss_texture() -> ImageTexture:
+	var w = 96
+	var h = 96
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# 1. Massive Ground Shadow
+	for y in range(68, 92):
+		for x in range(14, 82):
+			var dx = (x - 48.0) / 31.0
+			var dy = (y - 80.0) / 10.0
+			if dx * dx + dy * dy <= 1.0:
+				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.6))
+
+	# 2. Heavy Biomechanical Carapace
+	for y in range(18, 76):
+		for x in range(18, 78):
+			var dx = (x - 48.0) / 26.0
+			var dy = (y - 48.0) / 25.0
+			var dist = dx * dx + dy * dy
+			if dist <= 1.0:
+				var lum = 0.14 + (1.0 - dist) * 0.22
+				var col = Color(lum * 0.9, lum * 0.7, lum * 1.1, 1.0) # Dark Void Carapace
+
+				# Spiked side ridges
+				if (x < 28 or x > 68) and y < 55:
+					col = Color(0.35, 0.15, 0.25, 1.0)
+					if x == 20 or x == 76: col = Color(0.8, 0.2, 0.3, 1.0)
+
+				# Magma/Plasma Spinal Channels
+				if abs(x - 48) <= 2 and y >= 25 and y <= 65:
+					col = Color(3.5, 0.8, 0.1, 1.0)
+				elif abs(x - 48) <= 6 and (y % 8 == 0):
+					col = Color(2.5, 0.4, 0.1, 1.0)
+
+				img.set_pixel(x, y, col)
+
+	# 3. 4 Blazing Crimson HDR Eye Slits
+	var eyes = [
+		Vector2(42, 34), Vector2(54, 34),
+		Vector2(38, 38), Vector2(58, 38)
+	]
+	for ep in eyes:
+		_draw_circle_on_image(img, ep, 2.5, Color(3.8, 0.2, 0.2, 1.0))
+		img.set_pixel(int(ep.x), int(ep.y), Color(3.8, 2.5, 0.5, 1.0))
+
+	# 4. Massive Serrated Tusks / Horns
+	var left_tusk = [Vector2(32, 28), Vector2(26, 22), Vector2(22, 14), Vector2(20, 8)]
+	var right_tusk = [Vector2(64, 28), Vector2(70, 22), Vector2(74, 14), Vector2(76, 8)]
+	for pt in left_tusk + right_tusk:
+		_draw_circle_on_image(img, pt, 3.5, Color(0.2, 0.22, 0.28, 1.0))
+	img.set_pixel(20, 8, Color(3.5, 0.4, 0.2, 1.0))
+	img.set_pixel(76, 8, Color(3.5, 0.4, 0.2, 1.0))
+
+	return ImageTexture.create_from_image(img)
+
+
+static func create_mortar_canister_texture() -> ImageTexture:
+	var w = 16
+	var h = 16
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	for y in range(2, 14):
+		for x in range(4, 12):
+			var col = Color(0.2, 2.5, 0.6, 1.0) # Toxic Neon Green
+			if abs(x - 8) <= 1 and abs(y - 8) <= 1:
+				col = Color(3.5, 3.5, 1.5, 1.0) # Glowing core
+			img.set_pixel(x, y, col)
+
+	return ImageTexture.create_from_image(img)
+
+
+static func create_acid_pool_texture() -> ImageTexture:
+	var w = 48
+	var h = 48
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	for y in range(8, 40):
+		for x in range(6, 42):
+			var dx = (x - 24.0) / 16.0
+			var dy = (y - 24.0) / 11.0 # Isometric oval
+			var dist = dx * dx + dy * dy
+			if dist <= 1.0:
+				var alpha = 0.65 * (1.0 - dist * 0.3)
+				var col = Color(0.1, 1.8, 0.4, alpha)
+				# Corrosive bubbling highlights
+				if (x * y) % 11 == 0 and dist < 0.7:
+					col = Color(1.5, 3.2, 0.8, alpha * 1.3)
+				img.set_pixel(x, y, col)
+
+	return ImageTexture.create_from_image(img)
+
 
 
 # --- Utility Drawing Primitives for Image ---

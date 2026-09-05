@@ -17,6 +17,14 @@ signal upgrade_selected(upgrade_id: String)
 @onready var game_over_panel: PanelContainer = $GameOverModal
 @onready var game_over_stats: Label = $GameOverModal/VBox/StatsLabel
 
+@onready var boss_container: Control = $BossContainer
+@onready var boss_hp_bar: ProgressBar = $BossContainer/BossHPBar
+@onready var boss_label: Label = $BossContainer/BossLabel
+
+@onready var chest_modal: PanelContainer = $ChestModal
+@onready var chest_rewards_container: HBoxContainer = $ChestModal/VBox/RewardsContainer
+@onready var chest_claim_btn: Button = $ChestModal/VBox/ClaimButton
+
 var survival_seconds: float = 0.0
 var kills: int = 0
 var swarm_count: int = 0
@@ -25,6 +33,10 @@ var player_node: Node2D = null
 var target_hp: float = 100.0
 var max_hp: float = 100.0
 
+var target_boss_hp: float = 4500.0
+var max_boss_hp: float = 4500.0
+var pending_chest_rewards: Array[String] = []
+
 var surge_banner: Label = null
 var surge_banner_timer: float = 0.0
 
@@ -32,7 +44,11 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	level_up_panel.hide()
 	game_over_panel.hide()
+	if boss_container: boss_container.hide()
+	if chest_modal: chest_modal.hide()
 	$GameOverModal/VBox/RestartButton.pressed.connect(_on_restart_pressed)
+	if chest_claim_btn:
+		chest_claim_btn.pressed.connect(_on_chest_claim_pressed)
 	player_node = get_tree().get_first_node_in_group("player")
 	radar_rect.draw.connect(_on_radar_draw)
 
@@ -79,7 +95,89 @@ func _process(delta: float) -> void:
 		
 		# Smooth health bar
 		hp_bar.value = lerp(float(hp_bar.value), target_hp, 14.0 * delta)
+		if boss_container and boss_container.visible:
+			boss_hp_bar.value = lerp(float(boss_hp_bar.value), target_boss_hp, 10.0 * delta)
 		radar_rect.queue_redraw()
+
+func show_boss_bar(b_name: String, cur_hp: float, maximum: float) -> void:
+	max_boss_hp = maximum
+	target_boss_hp = cur_hp
+	boss_hp_bar.max_value = maximum
+	boss_hp_bar.value = cur_hp
+	boss_label.text = "%s - %d / %d HP" % [b_name, int(cur_hp), int(maximum)]
+	boss_container.show()
+
+func update_boss_health(cur_hp: float, maximum: float) -> void:
+	target_boss_hp = cur_hp
+	boss_label.text = "APEX LEVIATHAN - %d / %d HP" % [int(cur_hp), int(maximum)]
+
+func hide_boss_bar() -> void:
+	if boss_container:
+		boss_container.hide()
+
+func show_chest_jackpot() -> void:
+	get_tree().paused = true
+	for child in chest_rewards_container.get_children():
+		child.queue_free()
+	pending_chest_rewards.clear()
+
+	if not player_node:
+		player_node = get_tree().get_first_node_in_group("player")
+
+	var available = _build_available_upgrades()
+	available.shuffle()
+
+	var reward_count = randi_range(3, min(5, available.size()))
+	reward_count = max(reward_count, 1)
+
+	var picks: Array[Dictionary] = []
+	for i in range(min(reward_count, available.size())):
+		picks.append(available[i])
+
+	for item in picks:
+		pending_chest_rewards.append(item.id)
+		var card = _create_reward_card(item)
+		chest_rewards_container.add_child(card)
+
+	chest_modal.show()
+
+func _create_reward_card(item: Dictionary) -> PanelContainer:
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(160, 160)
+	var style = StyleBoxFlat.new()
+	style.set_corner_radius_all(8)
+	style.set_border_width_all(2)
+	style.bg_color = Color(0.14, 0.08, 0.02, 0.95)
+	style.border_color = Color(1.0, 0.8, 0.2, 1.0)
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.theme_override_constants.separation = 8
+
+	var stars = Label.new()
+	stars.text = item.stars
+	stars.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stars.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+	stars.add_theme_font_size_override("font_size", 12)
+
+	var title = Label.new()
+	title.text = item.title
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD
+	title.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	title.add_theme_font_size_override("font_size", 13)
+
+	vbox.add_child(stars)
+	vbox.add_child(title)
+	panel.add_child(vbox)
+	return panel
+
+func _on_chest_claim_pressed() -> void:
+	chest_modal.hide()
+	get_tree().paused = false
+	for up_id in pending_chest_rewards:
+		upgrade_selected.emit(up_id)
 
 func update_health(current: float, maximum: float) -> void:
 	max_hp = maximum
@@ -233,6 +331,18 @@ func _build_available_upgrades() -> Array[Dictionary]:
 			"title": "🌀 OMNI-SCYTHE VORTEX",
 			"desc": "4 lưỡi hái năng lượng khổng lồ bọc kín không gian xung quanh!"
 		})
+	if w_lv.has("tesla") and w_lv["tesla"] >= 5 and p_lv["energy_core"] >= 1 and not evo["tesla"]:
+		list.append({
+			"id": "tesla_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
+			"title": "⚡ MJOLNIR STORMCORE",
+			"desc": "Bão sấm sét cuồng nộ giáng liên hoàn khắp bản đồ xé nát quân thù!"
+		})
+	if w_lv.has("mortar") and w_lv["mortar"] >= 5 and p_lv["amp"] >= 1 and not evo["mortar"]:
+		list.append({
+			"id": "mortar_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
+			"title": "☣️ CORROSIVE CHERNOBYL",
+			"desc": "Bắn 4 pháo cối phóng xạ tạo biển axít hủy diệt làm tan chảy mọi quái vật!"
+		})
 
 	# 2. Weapons Unlocks & Upgrades
 	if w_lv["railgun"] < 5 and not evo["railgun"]:
@@ -284,31 +394,55 @@ func _build_available_upgrades() -> Array[Dictionary]:
 			"title": "🌀 NÂNG CẤP LƯỠI HÁI", "desc": "Tăng số lượng lưỡi dao, tốc độ xoay và bán kính quỹ đạo."
 		})
 
+	if w_lv.has("tesla"):
+		if w_lv["tesla"] == 0:
+			list.append({
+				"id": "tesla", "rarity": "weapon", "stars": "✨ VŨ KHÍ MỚI",
+				"title": "⚡ CUỘN DÂY TESLA", "desc": "Mở khóa phóng tia điện giật lan truyền qua nhiều kẻ địch liên tiếp."
+			})
+		elif w_lv["tesla"] < 5 and not evo["tesla"]:
+			list.append({
+				"id": "tesla", "rarity": "weapon", "stars": _get_stars(w_lv["tesla"]),
+				"title": "⚡ NÂNG CẤP TESLA", "desc": "Tăng số lần giật lan, sát thương điện và giảm thời gian nạp."
+			})
+
+	if w_lv.has("mortar"):
+		if w_lv["mortar"] == 0:
+			list.append({
+				"id": "mortar", "rarity": "weapon", "stars": "✨ VŨ KHÍ MỚI",
+				"title": "☣️ PHÁO CỐI AXÍT", "desc": "Mở khóa bắn đạn axít vòng cung tạo vũng độc ăn mòn diện rộng."
+			})
+		elif w_lv["mortar"] < 5 and not evo["mortar"]:
+			list.append({
+				"id": "mortar", "rarity": "weapon", "stars": _get_stars(w_lv["mortar"]),
+				"title": "☣️ NÂNG CẤP PHÁO CỐI", "desc": "Bắn thêm đạn cối, tăng bán kính và sát thương vũng axít."
+			})
+
 	# 3. Passive Items
 	if p_lv["energy_core"] < 5:
 		list.append({
 			"id": "energy_core", "rarity": "passive", "stars": _get_stars(p_lv["energy_core"]),
-			"title": "⚡ PIN NĂNG LƯỢNG", "desc": "Giảm 12% thời gian hồi chiêu mọi vũ khí (Tổ hợp tiến hóa Railgun)."
+			"title": "⚡ PIN NĂNG LƯỢNG", "desc": "Giảm 12% thời gian hồi chiêu mọi vũ khí (Tiến hóa Railgun & Tesla)."
 		})
 	if p_lv["nano_armor"] < 5:
 		list.append({
 			"id": "nano_armor", "rarity": "passive", "stars": _get_stars(p_lv["nano_armor"]),
-			"title": "🩸 GIÁP HỢP KIM", "desc": "+30 Máu tối đa và hồi phục 1.5 HP/giây (Tổ hợp tiến hóa Lưỡi Hái)."
+			"title": "🩸 GIÁP HỢP KIM", "desc": "+30 Máu tối đa và hồi phục 1.5 HP/giây (Tiến hóa Lưỡi Hái)."
 		})
 	if p_lv["thrusters"] < 5:
 		list.append({
 			"id": "thrusters", "rarity": "passive", "stars": _get_stars(p_lv["thrusters"]),
-			"title": "👟 BỘ ĐẨY PHẢN LỰC", "desc": "+35 Tốc độ di chuyển để luồn lách né quái (Tổ hợp tiến hóa Phun Lửa)."
+			"title": "👟 BỘ ĐẨY PHẢN LỰC", "desc": "+35 Tốc độ di chuyển để luồn lách né quái (Tiến hóa Phun Lửa)."
 		})
 	if p_lv["magnet"] < 5:
 		list.append({
 			"id": "magnet", "rarity": "passive", "stars": _get_stars(p_lv["magnet"]),
-			"title": "🧲 BỘ HÚT TINH THỂ", "desc": "+65 Bán kính hút ngọc kinh nghiệm từ xa (Tổ hợp tiến hóa Tên Lửa)."
+			"title": "🧲 BỘ HÚT TINH THỂ", "desc": "+65 Bán kính hút ngọc kinh nghiệm từ xa (Tiến hóa Tên Lửa)."
 		})
 	if p_lv["amp"] < 5:
 		list.append({
 			"id": "amp", "rarity": "passive", "stars": _get_stars(p_lv["amp"]),
-			"title": "💥 CHÍP KHUẾCH ĐẠI", "desc": "+20% Sát thương toàn bộ kho vũ khí (Tổ hợp tiến hóa Shockwave)."
+			"title": "💥 CHÍP KHUẾCH ĐẠI", "desc": "+20% Sát thương toàn bộ kho vũ khí (Tiến hóa Shockwave & Pháo Cối)."
 		})
 
 	return list

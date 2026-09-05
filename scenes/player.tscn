@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://player_swarm_v3"]
+[gd_scene load_steps=10 format=3 uid="uid://player_swarm_v3"]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/railgun.tscn" id="2_railgun"]
@@ -6,6 +6,8 @@
 [ext_resource type="PackedScene" path="res://scenes/weapons/shockwave.tscn" id="4_shockwave"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/magic_missile.tscn" id="5_missile"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/blade_orbit.tscn" id="6_blade"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/tesla_coil.tscn" id="7_tesla"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/bio_mortar.tscn" id="8_mortar"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_player"]
 radius = 14.0
@@ -36,3 +38,7 @@ texture_scale = 3.2
 [node name="MagicMissile" parent="Weapons" instance=ExtResource("5_missile")]
 
 [node name="BladeOrbit" parent="Weapons" instance=ExtResource("6_blade")]
+
+[node name="TeslaCoil" parent="Weapons" instance=ExtResource("7_tesla")]
+
+[node name="BioMortar" parent="Weapons" instance=ExtResource("8_mortar")]

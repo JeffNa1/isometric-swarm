@@ -35,10 +35,13 @@ var particle_mgr: Node2D = null
 @onready var shockwave_weapon: Node2D = $Weapons/Shockwave
 @onready var missile_weapon: Node2D = $Weapons/MagicMissile
 @onready var blade_weapon: Node2D = $Weapons/BladeOrbit
+@onready var tesla_weapon: Node2D = $Weapons/TeslaCoil
+@onready var mortar_weapon: Node2D = $Weapons/BioMortar
 
 var player_frames: Array[ImageTexture] = []
 var active_frame: int = 0
 var recoil_offset: Vector2 = Vector2.ZERO
+var overclock_timer: float = 0.0
 
 # --- Incremental Progression Inventories ---
 var weapon_levels = {
@@ -46,7 +49,9 @@ var weapon_levels = {
 	"flame": 0,
 	"shockwave": 0,
 	"missile": 0,
-	"blade": 0
+	"blade": 0,
+	"tesla": 0,
+	"mortar": 0
 }
 
 var passive_levels = {
@@ -62,7 +67,9 @@ var evolved_weapons = {
 	"flame": false,
 	"shockwave": false,
 	"missile": false,
-	"blade": false
+	"blade": false,
+	"tesla": false,
+	"mortar": false
 }
 
 func _ready() -> void:
@@ -89,6 +96,8 @@ func _setup_initial_weapons() -> void:
 	_set_weapon_active(shockwave_weapon, false)
 	_set_weapon_active(missile_weapon, false)
 	_set_weapon_active(blade_weapon, false)
+	_set_weapon_active(tesla_weapon, false)
+	_set_weapon_active(mortar_weapon, false)
 
 func _set_weapon_active(weapon_node: Node2D, active: bool) -> void:
 	if weapon_node:
@@ -103,11 +112,21 @@ func _get_managers() -> void:
 		camera_node = cur.get_node_or_null("Camera2D")
 		particle_mgr = cur.get_node_or_null("ParticleManager")
 
+func trigger_overclock(duration: float = 10.0) -> void:
+	overclock_timer = duration
+	if particle_mgr:
+		particle_mgr.spawn_sparks(global_position, Color(3.5, 3.0, 0.4, 1.0), 20)
+
 func _physics_process(delta: float) -> void:
 	if is_invulnerable:
 		invuln_timer -= delta
 		if invuln_timer <= 0.0:
 			is_invulnerable = false
+
+	if overclock_timer > 0.0:
+		overclock_timer -= delta
+		if particle_mgr and randf() < 0.3:
+			particle_mgr.spawn_sparks(global_position, Color(3.5, 2.5, 0.2, 1.0), 3)
 
 	if hurt_flash_timer > 0.0:
 		hurt_flash_timer -= delta
@@ -124,18 +143,21 @@ func _physics_process(delta: float) -> void:
 	var input_y = Input.get_action_raw_strength("move_down") - Input.get_action_raw_strength("move_up")
 	var raw_input = Vector2(input_x, input_y)
 
+	var current_spd = move_speed * (1.45 if overclock_timer > 0.0 else 1.0)
+
 	if raw_input.length_squared() > 0.0:
 		var input_norm = raw_input.normalized()
 		var iso_dir = Vector2(input_norm.x, input_norm.y * 0.75).normalized()
-		velocity = velocity.move_toward(iso_dir * move_speed, 1800.0 * delta)
-		walk_cycle += delta * 12.0
+		velocity = velocity.move_toward(iso_dir * current_spd, 1800.0 * delta)
+		walk_cycle += delta * (18.0 if overclock_timer > 0.0 else 12.0)
 		active_frame = int(fmod(walk_cycle, 4.0))
 		if input_x != 0.0:
 			facing_right = input_x > 0.0
 			
 		if particle_mgr and randf() < 0.35:
 			var jet_pos = global_position + Vector2(-8 if facing_right else 8, 2)
-			particle_mgr.spawn_sparks(jet_pos, Color(0.3, 1.5, 3.0, 1.0), 2)
+			var jet_col = Color(3.5, 2.5, 0.4, 1.0) if overclock_timer > 0.0 else Color(0.3, 1.5, 3.0, 1.0)
+			particle_mgr.spawn_sparks(jet_pos, jet_col, 2)
 	else:
 		velocity = velocity.move_toward(Vector2.ZERO, 2000.0 * delta)
 		walk_cycle = 0.0
@@ -226,6 +248,16 @@ func apply_upgrade(upgrade_id: String) -> void:
 			if blade_weapon and blade_weapon.has_method("evolve_vortex"):
 				blade_weapon.evolve_vortex()
 			return
+		"tesla_evo":
+			evolved_weapons["tesla"] = true
+			if tesla_weapon and tesla_weapon.has_method("evolve_mjolnir"):
+				tesla_weapon.evolve_mjolnir()
+			return
+		"mortar_evo":
+			evolved_weapons["mortar"] = true
+			if mortar_weapon and mortar_weapon.has_method("evolve_chernobyl"):
+				mortar_weapon.evolve_chernobyl()
+			return
 
 	# 2. Weapons Unlock & Upgrade
 	match upgrade_id:
@@ -260,6 +292,20 @@ func apply_upgrade(upgrade_id: String) -> void:
 			else:
 				weapon_levels["blade"] = min(5, weapon_levels["blade"] + 1)
 				if blade_weapon: blade_weapon.upgrade_blade()
+		"tesla":
+			if weapon_levels["tesla"] == 0:
+				weapon_levels["tesla"] = 1
+				_set_weapon_active(tesla_weapon, true)
+			else:
+				weapon_levels["tesla"] = min(5, weapon_levels["tesla"] + 1)
+				if tesla_weapon: tesla_weapon.upgrade_tesla()
+		"mortar":
+			if weapon_levels["mortar"] == 0:
+				weapon_levels["mortar"] = 1
+				_set_weapon_active(mortar_weapon, true)
+			else:
+				weapon_levels["mortar"] = min(5, weapon_levels["mortar"] + 1)
+				if mortar_weapon: mortar_weapon.upgrade_mortar()
 
 		# 3. Passive Items
 		"energy_core":
@@ -267,6 +313,8 @@ func apply_upgrade(upgrade_id: String) -> void:
 			if railgun_weapon: railgun_weapon.upgrade_speed(0.88)
 			if shockwave_weapon: shockwave_weapon.cooldown = max(0.9, shockwave_weapon.cooldown * 0.88)
 			if missile_weapon: missile_weapon.upgrade_speed(0.88)
+			if tesla_weapon: tesla_weapon.upgrade_speed(0.88)
+			if mortar_weapon: mortar_weapon.upgrade_speed(0.88)
 		"nano_armor":
 			passive_levels["nano_armor"] = min(5, passive_levels["nano_armor"] + 1)
 			max_health += 30.0
@@ -284,6 +332,8 @@ func apply_upgrade(upgrade_id: String) -> void:
 			if shockwave_weapon: shockwave_weapon.damage *= 1.2
 			if missile_weapon: missile_weapon.upgrade_damage(1.2)
 			if blade_weapon: blade_weapon.upgrade_damage(1.2)
+			if tesla_weapon: tesla_weapon.upgrade_damage(1.2)
+			if mortar_weapon: mortar_weapon.upgrade_damage(1.2)
 
 func _draw() -> void:
 	if player_frames.is_empty():

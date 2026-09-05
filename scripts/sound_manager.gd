@@ -18,6 +18,11 @@ var snd_scythe_slice: AudioStreamWAV
 var snd_gem: AudioStreamWAV
 var snd_alarm: AudioStreamWAV
 var snd_chest: AudioStreamWAV
+var snd_nuke: AudioStreamWAV
+var snd_tesla: AudioStreamWAV
+var snd_mortar: AudioStreamWAV
+var snd_acid: AudioStreamWAV
+var snd_crate: AudioStreamWAV
 
 # Dopamine gem chime streak tracking
 var gem_streak: int = 0
@@ -52,6 +57,11 @@ func _generate_all_sounds() -> void:
 	snd_gem = _synth_gem()
 	snd_alarm = _synth_alarm()
 	snd_chest = _synth_chest()
+	snd_nuke = _synth_nuke()
+	snd_tesla = _synth_tesla()
+	snd_mortar = _synth_mortar()
+	snd_acid = _synth_acid()
+	snd_crate = _synth_crate()
 
 func play_laser() -> void:
 	_play(snd_laser, -5.0, randf_range(0.93, 1.07))
@@ -79,6 +89,21 @@ func play_missile_explode() -> void:
 
 func play_scythe_slice() -> void:
 	_play(snd_scythe_slice, -7.0, randf_range(0.92, 1.15))
+
+func play_nuke() -> void:
+	_play(snd_nuke, 1.5, 1.0)
+
+func play_tesla() -> void:
+	_play(snd_tesla, -6.5, randf_range(0.9, 1.15))
+
+func play_mortar() -> void:
+	_play(snd_mortar, -5.0, randf_range(0.92, 1.08))
+
+func play_acid() -> void:
+	_play(snd_acid, -10.0, randf_range(0.88, 1.15))
+
+func play_crate_break() -> void:
+	_play(snd_crate, -4.5, randf_range(0.9, 1.1))
 
 func play_gem_pickup() -> void:
 	gem_streak = min(16, gem_streak + 1)
@@ -347,6 +372,106 @@ func _synth_levelup() -> AudioStreamWAV:
 		var note_t = float(i % note_dur) / float(note_dur)
 		var env = (1.0 - note_t * 0.5)
 		var sample = sin(phase) * env * 0.5 + sin(phase * 2.0) * env * 0.15
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth 10: Screen-Clearing EMP Nuke
+func _synth_nuke() -> AudioStreamWAV:
+	var duration = 0.8
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var phase = 0.0
+	var noise_out = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var freq = lerp(160.0, 20.0, sqrt(t))
+		phase += TAU * freq / float(SAMPLE_RATE)
+		var env = pow(1.0 - t, 1.4)
+		var noise = randf_range(-1.0, 1.0) * max(0.0, 1.0 - t * 2.5)
+		noise_out = lerp(noise_out, noise, 0.45)
+		var sample = (sin(phase) * 0.75 + noise_out * 0.7) * env
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth 11: Tesla Arc Crackle
+func _synth_tesla() -> AudioStreamWAV:
+	var duration = 0.14
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var phase = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var freq = lerp(1600.0, 350.0, t)
+		phase += TAU * freq / float(SAMPLE_RATE)
+		var env = pow(1.0 - t, 1.8)
+		var zap = 1.0 if sin(phase * 3.0) > 0.3 else -1.0
+		var sample = (sin(phase) * 0.5 + zap * 0.45) * env
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth 12: Bio-Mortar Canister Thump
+func _synth_mortar() -> AudioStreamWAV:
+	var duration = 0.16
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var phase = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var freq = lerp(220.0, 70.0, sqrt(t))
+		phase += TAU * freq / float(SAMPLE_RATE)
+		var env = pow(1.0 - t, 2.0)
+		var sample = sin(phase) * env * 0.85
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth 13: Corrosive Acid Sizzle
+func _synth_acid() -> AudioStreamWAV:
+	var duration = 0.22
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var noise_out = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var noise = randf_range(-1.0, 1.0)
+		noise_out = lerp(noise_out, noise, 0.6)
+		var env = sin(t * PI)
+		var sample = noise_out * env * 0.75
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth 14: Crate Crunch
+func _synth_crate() -> AudioStreamWAV:
+	var duration = 0.12
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var phase = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var freq = lerp(340.0, 80.0, t)
+		phase += TAU * freq / float(SAMPLE_RATE)
+		var env = 1.0 - t
+		var crack = randf_range(-0.5, 0.5)
+		var sample = (sin(phase) * 0.5 + crack * 0.5) * env
 		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
 		data.encode_s16(i * 2, val_16)
 
