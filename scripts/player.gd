@@ -1,21 +1,23 @@
 extends CharacterBody2D
 
 const LightHelper = preload("res://scripts/light_helper.gd")
+const SpriteFactory = preload("res://scripts/sprite_factory.gd")
 
 signal health_changed(current: float, maximum: float)
 signal xp_changed(current: int, target: int, lvl: int)
 signal leveled_up(new_level: int)
 signal player_died()
 
-@export var max_health: float = 120.0
-@export var base_speed: float = 260.0
+@export var max_health: float = 100.0
+@export var base_speed: float = 250.0
 
-var current_health: float = 120.0
-var move_speed: float = 260.0
+var current_health: float = 100.0
+var move_speed: float = 250.0
+var pickup_radius: float = 85.0
 
 var xp: int = 0
 var level: int = 1
-var xp_to_next: int = 40
+var xp_to_next: int = 43
 
 var walk_cycle: float = 0.0
 var facing_right: bool = true
@@ -34,15 +36,39 @@ var particle_mgr: Node2D = null
 @onready var missile_weapon: Node2D = $Weapons/MagicMissile
 @onready var blade_weapon: Node2D = $Weapons/BladeOrbit
 
-const SpriteFactory = preload("res://scripts/sprite_factory.gd")
-
 var player_frames: Array[ImageTexture] = []
 var active_frame: int = 0
 var recoil_offset: Vector2 = Vector2.ZERO
 
+# --- Incremental Progression Inventories ---
+var weapon_levels = {
+	"railgun": 1,
+	"flame": 0,
+	"shockwave": 0,
+	"missile": 0,
+	"blade": 0
+}
+
+var passive_levels = {
+	"energy_core": 0,
+	"nano_armor": 0,
+	"thrusters": 0,
+	"magnet": 0,
+	"amp": 0
+}
+
+var evolved_weapons = {
+	"railgun": false,
+	"flame": false,
+	"shockwave": false,
+	"missile": false,
+	"blade": false
+}
+
 func _ready() -> void:
 	current_health = max_health
 	move_speed = base_speed
+	xp_to_next = get_xp_needed(level)
 	health_changed.emit(current_health, max_health)
 	xp_changed.emit(xp, xp_to_next, level)
 
@@ -51,9 +77,24 @@ func _ready() -> void:
 	if aura_light:
 		aura_light.texture = LightHelper.get_radial_texture(128)
 		aura_light.energy = 0.85
-		
+
+	_setup_initial_weapons()
 	_get_managers()
 	queue_redraw()
+
+func _setup_initial_weapons() -> void:
+	# Scrappy start: ONLY Railgun Lv 1 is active!
+	_set_weapon_active(railgun_weapon, true)
+	_set_weapon_active(flame_weapon, false)
+	_set_weapon_active(shockwave_weapon, false)
+	_set_weapon_active(missile_weapon, false)
+	_set_weapon_active(blade_weapon, false)
+
+func _set_weapon_active(weapon_node: Node2D, active: bool) -> void:
+	if weapon_node:
+		weapon_node.visible = active
+		weapon_node.set_process(active)
+		weapon_node.set_physics_process(active)
 
 func _get_managers() -> void:
 	var cur = get_tree().current_scene
@@ -75,6 +116,10 @@ func _physics_process(delta: float) -> void:
 	if recoil_offset.length_squared() > 0.001:
 		recoil_offset = recoil_offset.move_toward(Vector2.ZERO, 70.0 * delta)
 
+	# Nano Armor passive health regeneration
+	if passive_levels["nano_armor"] > 0:
+		heal(1.5 * float(passive_levels["nano_armor"]) * delta)
+
 	var input_x = Input.get_action_raw_strength("move_right") - Input.get_action_raw_strength("move_left")
 	var input_y = Input.get_action_raw_strength("move_down") - Input.get_action_raw_strength("move_up")
 	var raw_input = Vector2(input_x, input_y)
@@ -88,7 +133,6 @@ func _physics_process(delta: float) -> void:
 		if input_x != 0.0:
 			facing_right = input_x > 0.0
 			
-		# Thruster jet sparks when sprinting
 		if particle_mgr and randf() < 0.35:
 			var jet_pos = global_position + Vector2(-8 if facing_right else 8, 2)
 			particle_mgr.spawn_sparks(jet_pos, Color(0.3, 1.5, 3.0, 1.0), 2)
@@ -132,12 +176,15 @@ func take_damage(amount: float) -> void:
 	if current_health <= 0.0:
 		player_died.emit()
 
+func get_xp_needed(lvl: int) -> int:
+	return int(25.0 + pow(float(lvl), 1.55) * 18.0)
+
 func add_xp(amount: int) -> void:
 	xp += amount
 	while xp >= xp_to_next:
 		xp -= xp_to_next
 		level += 1
-		xp_to_next = int(xp_to_next * 1.3) + 25
+		xp_to_next = get_xp_needed(level)
 
 		if not sound_mgr:
 			_get_managers()
@@ -152,26 +199,91 @@ func heal(amount: float) -> void:
 	health_changed.emit(current_health, max_health)
 
 func apply_upgrade(upgrade_id: String) -> void:
+	# 1. Check Super Evolutions
+	match upgrade_id:
+		"railgun_evo":
+			evolved_weapons["railgun"] = true
+			if railgun_weapon and railgun_weapon.has_method("evolve_hyperion"):
+				railgun_weapon.evolve_hyperion()
+			return
+		"flame_evo":
+			evolved_weapons["flame"] = true
+			if flame_weapon and flame_weapon.has_method("evolve_sunstorm"):
+				flame_weapon.evolve_sunstorm()
+			return
+		"shockwave_evo":
+			evolved_weapons["shockwave"] = true
+			if shockwave_weapon and shockwave_weapon.has_method("evolve_supernova"):
+				shockwave_weapon.evolve_supernova()
+			return
+		"missile_evo":
+			evolved_weapons["missile"] = true
+			if missile_weapon and missile_weapon.has_method("evolve_barrage"):
+				missile_weapon.evolve_barrage()
+			return
+		"blade_evo":
+			evolved_weapons["blade"] = true
+			if blade_weapon and blade_weapon.has_method("evolve_vortex"):
+				blade_weapon.evolve_vortex()
+			return
+
+	# 2. Weapons Unlock & Upgrade
 	match upgrade_id:
 		"railgun":
+			weapon_levels["railgun"] = min(5, weapon_levels["railgun"] + 1)
 			if railgun_weapon: railgun_weapon.upgrade_beam()
 		"flame":
-			if flame_weapon: flame_weapon.upgrade_flame()
+			if weapon_levels["flame"] == 0:
+				weapon_levels["flame"] = 1
+				_set_weapon_active(flame_weapon, true)
+			else:
+				weapon_levels["flame"] = min(5, weapon_levels["flame"] + 1)
+				if flame_weapon: flame_weapon.upgrade_flame()
 		"shockwave":
-			if shockwave_weapon: shockwave_weapon.upgrade_blast()
+			if weapon_levels["shockwave"] == 0:
+				weapon_levels["shockwave"] = 1
+				_set_weapon_active(shockwave_weapon, true)
+			else:
+				weapon_levels["shockwave"] = min(5, weapon_levels["shockwave"] + 1)
+				if shockwave_weapon: shockwave_weapon.upgrade_blast()
 		"missile":
-			if missile_weapon: missile_weapon.upgrade_missile()
+			if weapon_levels["missile"] == 0:
+				weapon_levels["missile"] = 1
+				_set_weapon_active(missile_weapon, true)
+			else:
+				weapon_levels["missile"] = min(5, weapon_levels["missile"] + 1)
+				if missile_weapon: missile_weapon.upgrade_missile()
 		"blade":
-			if blade_weapon: blade_weapon.upgrade_blade()
-		"damage":
-			if railgun_weapon: railgun_weapon.upgrade_damage(1.3)
-			if missile_weapon: missile_weapon.upgrade_damage(1.3)
-			if blade_weapon: blade_weapon.upgrade_damage(1.3)
-		"speed":
-			move_speed += 40.0
-		"health":
-			max_health += 40.0
-			heal(80.0)
+			if weapon_levels["blade"] == 0:
+				weapon_levels["blade"] = 1
+				_set_weapon_active(blade_weapon, true)
+			else:
+				weapon_levels["blade"] = min(5, weapon_levels["blade"] + 1)
+				if blade_weapon: blade_weapon.upgrade_blade()
+
+		# 3. Passive Items
+		"energy_core":
+			passive_levels["energy_core"] = min(5, passive_levels["energy_core"] + 1)
+			if railgun_weapon: railgun_weapon.upgrade_speed(0.88)
+			if shockwave_weapon: shockwave_weapon.cooldown = max(0.9, shockwave_weapon.cooldown * 0.88)
+			if missile_weapon: missile_weapon.upgrade_speed(0.88)
+		"nano_armor":
+			passive_levels["nano_armor"] = min(5, passive_levels["nano_armor"] + 1)
+			max_health += 30.0
+			heal(60.0)
+		"thrusters":
+			passive_levels["thrusters"] = min(5, passive_levels["thrusters"] + 1)
+			move_speed += 35.0
+		"magnet":
+			passive_levels["magnet"] = min(5, passive_levels["magnet"] + 1)
+			pickup_radius += 65.0
+		"amp":
+			passive_levels["amp"] = min(5, passive_levels["amp"] + 1)
+			if railgun_weapon: railgun_weapon.upgrade_damage(1.2)
+			if flame_weapon: flame_weapon.damage_per_tick *= 1.2
+			if shockwave_weapon: shockwave_weapon.damage *= 1.2
+			if missile_weapon: missile_weapon.upgrade_damage(1.2)
+			if blade_weapon: blade_weapon.upgrade_damage(1.2)
 
 func _draw() -> void:
 	if player_frames.is_empty():
@@ -181,11 +293,9 @@ func _draw() -> void:
 	var flip = 1.0 if facing_right else -1.0
 	var col = Color(5.0, 5.0, 5.0, 1.0) if hurt_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, 1.0)
 
-	# Transform for horizontal flip & recoil kick
 	draw_set_transform(recoil_offset, 0.0, Vector2(flip, 1.0))
 	draw_texture(tex, Vector2(-24.0, -41.0), col)
 
-	# Dynamic HDR reactor pulse accent
 	var pulse = 0.8 + 0.3 * sin(Time.get_ticks_msec() * 0.008)
 	draw_circle(Vector2(0, -22), 2.5, Color(0.3 * pulse, 2.5 * pulse, 3.5 * pulse, 0.75))
 

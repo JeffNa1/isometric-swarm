@@ -74,9 +74,17 @@ func _spawn_missile(target_pos: Vector2, volley_idx: int) -> void:
 
 	projectile.setup(fire_dir, target_pos, damage)
 
+var is_evolved: bool = false
+
+func evolve_barrage() -> void:
+	is_evolved = true
+	missiles_per_volley = 6
+	damage = 85.0
+	fire_rate = 0.55
+
 func upgrade_missile() -> void:
 	missiles_per_volley += 1
-	damage += 15.0
+	damage += 12.0
 	fire_rate = max(0.4, fire_rate * 0.85)
 
 func upgrade_damage(multiplier: float) -> void:

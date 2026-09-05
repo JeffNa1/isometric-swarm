@@ -32,6 +32,16 @@ func _init_trails() -> void:
 		var t_arr: Array[Vector2] = []
 		blade_trails.append(t_arr)
 
+var is_evolved: bool = false
+
+func evolve_vortex() -> void:
+	is_evolved = true
+	blade_count = 4
+	damage = 65.0
+	orbit_radius = 120.0
+	rotation_speed = 6.0
+	_init_trails()
+
 func upgrade_blade() -> void:
 	blade_count += 1
 	damage += 8.0

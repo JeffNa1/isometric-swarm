@@ -114,10 +114,19 @@ func _burn_and_emit_stream() -> void:
 			particle_mgr.spawn_scorch_mark(ground_p, Color(2.2, 0.8, 0.1, 0.85))
 			particle_mgr.spawn_sparks(ground_p, Color(2.5, 1.2, 0.2, 1.0), 3)
 
+var is_evolved: bool = false
+
+func evolve_sunstorm() -> void:
+	is_evolved = true
+	flame_range = 360.0
+	flame_angle = 360.0
+	damage_per_tick = 22.0
+	tick_interval = 0.05
+
 func upgrade_flame() -> void:
-	flame_range += 45.0
-	flame_angle += 10.0
-	damage_per_tick += 3.5
+	flame_range += 35.0
+	flame_angle += 8.0
+	damage_per_tick += 3.0
 
 func _draw() -> void:
 	# Draw turbulent rolling fireball puffs

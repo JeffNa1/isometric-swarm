@@ -133,6 +133,15 @@ func _generate_helix_points() -> void:
 		var wave = sin(t * TAU * 4.5) * 10.0 * (1.0 - t * 0.3)
 		helix_points.append(base_p + perp * wave)
 
+var is_evolved: bool = false
+
+func evolve_hyperion() -> void:
+	is_evolved = true
+	damage = 240.0
+	fire_rate = 0.45
+	beam_width = 46.0
+	beam_length = 950.0
+
 func upgrade_damage(multiplier: float) -> void:
 	damage *= multiplier
 
@@ -140,9 +149,9 @@ func upgrade_speed(multiplier: float) -> void:
 	fire_rate = max(0.2, fire_rate * multiplier)
 
 func upgrade_beam() -> void:
-	beam_width += 12.0
-	beam_length += 120.0
-	damage += 25.0
+	beam_width += 10.0
+	beam_length += 80.0
+	damage += 30.0
 
 func _draw() -> void:
 	if beam_draw_timer <= 0.0:

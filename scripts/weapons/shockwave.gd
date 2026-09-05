@@ -89,10 +89,19 @@ func _generate_arc_ring() -> void:
 		var p = Vector2(cos(a) * jitter, sin(a) * 0.5 * jitter)
 		arc_ring_points.append(p)
 
+var is_evolved: bool = false
+
+func evolve_supernova() -> void:
+	is_evolved = true
+	blast_radius = 380.0
+	damage = 260.0
+	cooldown = 1.35
+	knockback = 650.0
+
 func upgrade_blast() -> void:
-	blast_radius += 50.0
-	damage += 30.0
-	cooldown = max(1.0, cooldown * 0.82)
+	blast_radius += 40.0
+	damage += 25.0
+	cooldown = max(1.1, cooldown * 0.85)
 
 func _draw() -> void:
 	if anim_timer <= 0.0:

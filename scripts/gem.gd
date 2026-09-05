@@ -1,10 +1,12 @@
 extends Area2D
 
 @export var xp_value: int = 10
+@export var is_super_gem: bool = false
+
 var target: Node2D = null
 var speed: float = 0.0
-var max_speed: float = 550.0
-var acceleration: float = 800.0
+var max_speed: float = 680.0
+var acceleration: float = 1200.0
 var bob_offset: float = 0.0
 var time_alive: float = 0.0
 
@@ -20,36 +22,64 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	time_alive += delta
-	bob_offset = sin(time_alive * 6.0) * 3.0
-	
+	bob_offset = sin(time_alive * 6.0) * 3.5
+
+	# Magnetic check if untargeted
+	if not target:
+		var cur = get_tree().current_scene
+		if cur:
+			var player = cur.get_node_or_null("Entities/Player")
+			if player and is_instance_valid(player):
+				var rad = player.get("pickup_radius")
+				if rad == null: rad = 85.0
+				if global_position.distance_to(player.global_position) < rad:
+					target = player
+					speed = 140.0
+
+	# Fly toward target with accelerating curve
 	if target and is_instance_valid(target):
 		speed = move_toward(speed, max_speed, acceleration * delta)
 		var dir = (target.global_position - global_position).normalized()
 		global_position += dir * speed * delta
-		
-		if global_position.distance_to(target.global_position) < 18.0:
+
+		if global_position.distance_to(target.global_position) < 24.0:
 			if target.has_method("add_xp"):
 				target.add_xp(xp_value)
+			var cur = get_tree().current_scene
+			if cur:
+				var snd = cur.get_node_or_null("SoundManager")
+				if snd:
+					if is_super_gem and snd.has_method("play_chest"):
+						snd.play_chest()
+					elif snd.has_method("play_gem_pickup"):
+						snd.play_gem_pickup()
 			queue_free()
-	
+
 	queue_redraw()
 
 func attract_to(new_target: Node2D) -> void:
 	if not target:
 		target = new_target
-		speed = 100.0
+		speed = 140.0
 
 func _draw() -> void:
 	# Ground shadow (isometric ellipse on floor)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.5))
 	var shadow_scale = 1.0 - (bob_offset * 0.05)
-	draw_circle(Vector2.ZERO, 6.0 * shadow_scale, Color(0.0, 0.0, 0.0, 0.42))
+	var shadow_size = 8.5 if is_super_gem else 6.0
+	draw_circle(Vector2.ZERO, shadow_size * shadow_scale, Color(0.0, 0.0, 0.0, 0.45))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	# Hovering Faceted 3D Diamond Crystal
 	if gem_tex:
 		var draw_pos = Vector2(-12.0, -18.0 + bob_offset)
-		draw_texture(gem_tex, draw_pos)
-		# Specular refractive core pulse
-		var pulse = 0.8 + 0.3 * sin(time_alive * 7.0)
-		draw_circle(Vector2(0, -8.0 + bob_offset), 2.0, Color(0.4 * pulse, 2.8 * pulse, 3.8 * pulse, 0.9))
+		if is_super_gem:
+			# Super Gem: Golden halo & larger scale
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.4, 1.4))
+			draw_texture(gem_tex, draw_pos, Color(2.0, 1.5, 0.3, 1.0))
+			draw_circle(Vector2(0, -8.0 + bob_offset), 4.5, Color(3.5, 2.5, 0.5, 0.85))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		else:
+			draw_texture(gem_tex, draw_pos)
+			var pulse = 0.8 + 0.3 * sin(time_alive * 7.0)
+			draw_circle(Vector2(0, -8.0 + bob_offset), 2.0, Color(0.4 * pulse, 2.8 * pulse, 3.8 * pulse, 0.9))

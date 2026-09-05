@@ -30,8 +30,9 @@ var sound_mgr: Node = null
 var particle_mgr: Node2D = null
 var floating_txt_mgr: Node2D = null
 var player_radius: float = 14.0
+var elapsed_time: float = 0.0
 
-signal enemy_killed(xp_val: int, pos: Vector2)
+signal enemy_killed(xp_val: int, pos: Vector2, is_boss: bool)
 signal swarm_count_changed(count: int)
 
 func _ready() -> void:
@@ -108,25 +109,33 @@ func spawn_enemy(spawn_pos: Vector2, enemy_type: int) -> bool:
 	hit_timers[idx] = 0.0
 	types[idx] = enemy_type
 
+	# Exponential Time-based Scaling Curves
+	var hp_mult = 1.0 + pow(elapsed_time / 60.0, 1.45) * 0.65
+	var spd_mult = min(1.75, 1.0 + (elapsed_time / 360.0) * 0.5)
+	var dmg_mult = 1.0 + (elapsed_time / 200.0) * 0.6
+
 	match enemy_type:
 		1: # Scout (Fast, Agile, Purple Wasp)
-			max_healths[idx] = 25.0
-			healths[idx] = 25.0
-			speeds[idx] = 195.0
+			var base_hp = 25.0 * hp_mult
+			max_healths[idx] = base_hp
+			healths[idx] = base_hp
+			speeds[idx] = 190.0 * spd_mult
 			radii[idx] = 12.0
-			damages[idx] = 8.0
+			damages[idx] = 8.0 * dmg_mult
 		2: # Brute (Huge, High HP, Volcanic Behemoth)
-			max_healths[idx] = 175.0
-			healths[idx] = 175.0
-			speeds[idx] = 78.0
+			var base_hp = 240.0 * hp_mult
+			max_healths[idx] = base_hp
+			healths[idx] = base_hp
+			speeds[idx] = 75.0 * spd_mult
 			radii[idx] = 25.0
-			damages[idx] = 30.0
+			damages[idx] = 32.0 * dmg_mult
 		_: # 0: Crawler (Swarm backbone, Crimson Beetle)
-			max_healths[idx] = 40.0
-			healths[idx] = 40.0
-			speeds[idx] = 130.0
+			var base_hp = 42.0 * hp_mult
+			max_healths[idx] = base_hp
+			healths[idx] = base_hp
+			speeds[idx] = 125.0 * spd_mult
 			radii[idx] = 15.0
-			damages[idx] = 12.0
+			damages[idx] = 12.0 * dmg_mult
 
 	active_count += 1
 	swarm_count_changed.emit(active_count)
@@ -141,6 +150,7 @@ func spawn_cluster(center: Vector2, count: int, enemy_type: int = 0) -> void:
 		spawn_enemy(center + offset, enemy_type)
 
 func _physics_process(delta: float) -> void:
+	elapsed_time += delta
 	if active_count == 0:
 		crawler_mmi.multimesh.visible_instance_count = 0
 		scout_mmi.multimesh.visible_instance_count = 0
@@ -307,8 +317,9 @@ func _apply_damage_to_index(idx: int, dmg: float, knock: Vector2, is_crit: bool 
 func _kill_enemy(idx: int) -> void:
 	var pos = positions[idx]
 	var e_type = types[idx]
-	var xp = 35 if e_type == 2 else (15 if e_type == 1 else 10)
-	enemy_killed.emit(xp, pos)
+	var is_boss = (e_type == 2)
+	var xp = 120 if is_boss else (18 if e_type == 1 else 10)
+	enemy_killed.emit(xp, pos, is_boss)
 
 	# Audio splat
 	if sound_mgr and randf() < 0.4:

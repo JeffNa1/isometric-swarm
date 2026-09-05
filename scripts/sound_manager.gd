@@ -1,7 +1,7 @@
 extends Node
 
 const SAMPLE_RATE: int = 22050
-const POOL_SIZE: int = 12
+const POOL_SIZE: int = 16
 
 var players: Array[AudioStreamPlayer] = []
 var player_idx: int = 0
@@ -15,6 +15,13 @@ var snd_levelup: AudioStreamWAV
 var snd_missile_launch: AudioStreamWAV
 var snd_missile_explode: AudioStreamWAV
 var snd_scythe_slice: AudioStreamWAV
+var snd_gem: AudioStreamWAV
+var snd_alarm: AudioStreamWAV
+var snd_chest: AudioStreamWAV
+
+# Dopamine gem chime streak tracking
+var gem_streak: int = 0
+var gem_streak_timer: float = 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -26,6 +33,12 @@ func _ready() -> void:
 
 	_generate_all_sounds()
 
+func _process(delta: float) -> void:
+	if gem_streak_timer > 0.0:
+		gem_streak_timer -= delta
+		if gem_streak_timer <= 0.0:
+			gem_streak = 0
+
 func _generate_all_sounds() -> void:
 	snd_laser = _synth_laser()
 	snd_flame = _synth_flame()
@@ -36,6 +49,9 @@ func _generate_all_sounds() -> void:
 	snd_missile_launch = _synth_missile_launch()
 	snd_missile_explode = _synth_missile_explode()
 	snd_scythe_slice = _synth_scythe_slice()
+	snd_gem = _synth_gem()
+	snd_alarm = _synth_alarm()
+	snd_chest = _synth_chest()
 
 func play_laser() -> void:
 	_play(snd_laser, -5.0, randf_range(0.93, 1.07))
@@ -64,6 +80,21 @@ func play_missile_explode() -> void:
 func play_scythe_slice() -> void:
 	_play(snd_scythe_slice, -7.0, randf_range(0.92, 1.15))
 
+func play_gem_pickup() -> void:
+	gem_streak = min(16, gem_streak + 1)
+	gem_streak_timer = 0.65
+	# Ascending pentatonic pitch ladder for casino-grade dopamine loop
+	var pentatonic = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]
+	var semitones = pentatonic[min(gem_streak, pentatonic.size() - 1)]
+	var pitch = pow(2.0, float(semitones) / 12.0)
+	_play(snd_gem, -8.5, pitch)
+
+func play_alarm() -> void:
+	_play(snd_alarm, -2.0, 1.0)
+
+func play_chest() -> void:
+	_play(snd_chest, -1.5, 1.0)
+
 func _play(stream: AudioStreamWAV, volume_db: float, pitch: float) -> void:
 	if not stream:
 		return
@@ -74,7 +105,69 @@ func _play(stream: AudioStreamWAV, volume_db: float, pitch: float) -> void:
 	p.pitch_scale = pitch
 	p.play()
 
-# Synth 1: Piercing Magnetic Railgun (Crack + Ion Sweep)
+# Synth: Crystal Gem Chime
+func _synth_gem() -> AudioStreamWAV:
+	var duration = 0.14
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var phase1 = 0.0
+	var phase2 = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		phase1 += TAU * 880.0 / float(SAMPLE_RATE)
+		phase2 += TAU * 1760.0 / float(SAMPLE_RATE)
+		var env = pow(1.0 - t, 2.5)
+		var sample = (sin(phase1) * 0.7 + sin(phase2) * 0.3) * env
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth: Swarm Surge Siren Alarm
+func _synth_alarm() -> AudioStreamWAV:
+	var duration = 0.65
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var phase = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var freq = 480.0 + sin(t * TAU * 3.5) * 160.0
+		phase += TAU * freq / float(SAMPLE_RATE)
+		var env = sin(t * PI)
+		var sample = (sin(phase) + 0.3 * sin(phase * 3.0)) * env * 0.8
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth: Jackpot Chest Fanfare
+func _synth_chest() -> AudioStreamWAV:
+	var duration = 0.55
+	var total_samples = int(SAMPLE_RATE * duration)
+	var data = PackedByteArray()
+	data.resize(total_samples * 2)
+
+	var notes = [440.0, 554.37, 659.25, 880.0]
+	var seg_len = total_samples / 4
+
+	var phase = 0.0
+	for i in range(total_samples):
+		var note_idx = min(3, i / seg_len)
+		var freq = notes[note_idx]
+		phase += TAU * freq / float(SAMPLE_RATE)
+		var seg_t = float(i % seg_len) / float(seg_len)
+		var env = pow(1.0 - seg_t * 0.4, 1.5)
+		var sample = (sin(phase) + 0.25 * sin(phase * 2.0)) * env * 0.75
+		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, val_16)
+
+	return _make_wav(data)
+
+# Synth 1: Piercing Magnetic Railgun
 func _synth_laser() -> AudioStreamWAV:
 	var duration = 0.16
 	var total_samples = int(SAMPLE_RATE * duration)
@@ -87,8 +180,6 @@ func _synth_laser() -> AudioStreamWAV:
 		var freq = lerp(1800.0, 140.0, t * t)
 		phase += TAU * freq / float(SAMPLE_RATE)
 		var env = pow(1.0 - t, 2.2)
-		
-		# Magnetic distortion burst at t < 0.2
 		var crack = randf_range(-1.0, 1.0) * max(0.0, 1.0 - t * 7.0) * 0.45
 		var sample = (sin(phase) * 0.75 + crack) * env
 		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
@@ -96,7 +187,7 @@ func _synth_laser() -> AudioStreamWAV:
 
 	return _make_wav(data)
 
-# Synth 2: Flame Roar (Filtered White Noise Burst)
+# Synth 2: Flame Roar
 func _synth_flame() -> AudioStreamWAV:
 	var duration = 0.1
 	var total_samples = int(SAMPLE_RATE * duration)
@@ -114,7 +205,7 @@ func _synth_flame() -> AudioStreamWAV:
 
 	return _make_wav(data)
 
-# Synth 3: Shockwave Cataclysm (Sub-bass rumble + seismic crack)
+# Synth 3: Shockwave Cataclysm
 func _synth_shockwave() -> AudioStreamWAV:
 	var duration = 0.45
 	var total_samples = int(SAMPLE_RATE * duration)
@@ -128,18 +219,16 @@ func _synth_shockwave() -> AudioStreamWAV:
 		var freq = lerp(150.0, 28.0, sqrt(t))
 		phase += TAU * freq / float(SAMPLE_RATE)
 		var env = pow(1.0 - t, 1.6)
-		
 		var sub = sin(phase) * env
 		var noise = randf_range(-1.0, 1.0) * max(0.0, 1.0 - t * 3.5) * 0.65
 		noise_out = lerp(noise_out, noise, 0.4)
-		
 		var sample = (sub * 0.8 + noise_out * 0.45)
 		var val_16 = int(clamp(sample, -1.0, 1.0) * 32767.0)
 		data.encode_s16(i * 2, val_16)
 
 	return _make_wav(data)
 
-# Synth 4: Missile Launch (Ascending Whoosh)
+# Synth 4: Missile Launch
 func _synth_missile_launch() -> AudioStreamWAV:
 	var duration = 0.18
 	var total_samples = int(SAMPLE_RATE * duration)
@@ -161,7 +250,7 @@ func _synth_missile_launch() -> AudioStreamWAV:
 
 	return _make_wav(data)
 
-# Synth 5: Missile Explode (Compact Punchy Bang + Shrapnel)
+# Synth 5: Missile Explode
 func _synth_missile_explode() -> AudioStreamWAV:
 	var duration = 0.28
 	var total_samples = int(SAMPLE_RATE * duration)
@@ -183,7 +272,7 @@ func _synth_missile_explode() -> AudioStreamWAV:
 
 	return _make_wav(data)
 
-# Synth 6: Scythe Slash (Metallic Swish)
+# Synth 6: Scythe Slash
 func _synth_scythe_slice() -> AudioStreamWAV:
 	var duration = 0.12
 	var total_samples = int(SAMPLE_RATE * duration)
