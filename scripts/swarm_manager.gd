@@ -183,9 +183,9 @@ func _physics_process(delta: float) -> void:
 		var iso_dir = Vector2(norm_to_player.x, norm_to_player.y * 0.75).normalized()
 
 		var sep_force = Vector2.ZERO
+		var rad_i = radii[i]
 		if dist_to_player < 950.0:
 			var neighbors = spatial_grid.get_neighbors_capped(pos, 6)
-			var rad_i = radii[i]
 
 			for n_idx in neighbors:
 				if n_idx != i and n_idx < active_count:
