@@ -1459,3 +1459,295 @@ static func create_pixel_bar_stylebox(tex: Texture2D) -> StyleBoxTexture:
 	return sb
 
 
+static var _plasma_cache: Dictionary = {}
+
+static func create_glossy_plasma_fluid_texture(fill_col: Color, is_ghost: bool = false) -> ImageTexture:
+	var key = "plasma_%s_%s" % [fill_col.to_html(), str(is_ghost)]
+	if _plasma_cache.has(key):
+		return _plasma_cache[key]
+
+	var w = 16
+	var h = 18
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	for y in range(h):
+		for x in range(w):
+			if x == w - 1:
+				# Glass capsule seam / metal rib divider
+				if y == 0 or y == h - 1:
+					img.set_pixel(x, y, Color(0.01, 0.02, 0.04, 0.95))
+				elif y == 1:
+					img.set_pixel(x, y, Color(1.0, 1.0, 1.0, 0.8))
+				else:
+					img.set_pixel(x, y, Color(0.03, 0.06, 0.10, 0.95))
+			else:
+				if is_ghost:
+					# Amber ember lag trail with soft sparkle
+					if y == 0 or y == h - 1:
+						img.set_pixel(x, y, Color(0.02, 0.03, 0.05, 0.9))
+					elif y == 1 or y == 2:
+						img.set_pixel(x, y, Color(1.0, 0.9, 0.4, 0.85))
+					elif y >= h - 3:
+						img.set_pixel(x, y, Color(0.5, 0.25, 0.05, 0.8))
+					else:
+						var dither = ((x + y) % 3 == 0)
+						var c = Color(1.0, 0.65, 0.1, 0.9) if dither else Color(0.85, 0.5, 0.08, 0.85)
+						img.set_pixel(x, y, c)
+				else:
+					# Rich plasma fluid with top glossy glass reflection (from Ref Image 1)
+					if y == 0:
+						# Top glass dark rim
+						img.set_pixel(x, y, Color(0.01, 0.02, 0.05, 0.95))
+					elif y == 1:
+						# Pure white specular gloss reflection streak
+						img.set_pixel(x, y, Color(1.0, 1.0, 1.0, 0.96))
+					elif y == 2:
+						# Soft light bleed from specular highlight
+						img.set_pixel(x, y, fill_col.lightened(0.55))
+					elif y >= h - 3 and y < h - 1:
+						# Bottom curve shadow of glass cylinder
+						img.set_pixel(x, y, fill_col.darkened(0.45))
+					elif y == h - 1:
+						# Bottom glass dark rim
+						img.set_pixel(x, y, Color(0.01, 0.02, 0.05, 0.95))
+					else:
+						# Luminous core with subtle micro-sparkle
+						var spark = ((x * 3 + y * 7) % 7 == 0)
+						var c = fill_col.lightened(0.18) if spark else fill_col
+						img.set_pixel(x, y, c)
+
+	var tex = ImageTexture.create_from_image(img)
+	_plasma_cache[key] = tex
+	return tex
+
+static var _cell_cache: Dictionary = {}
+
+static func create_energy_cell_texture(is_active: bool) -> ImageTexture:
+	var key = "cell_%s" % str(is_active)
+	if _cell_cache.has(key):
+		return _cell_cache[key]
+
+	var w = 8
+	var h = 12
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	var outer_dark = Color(0.01, 0.02, 0.04, 0.98)
+	for y in range(h):
+		for x in range(w):
+			var is_edge = (x == 0 or x == w - 1 or y == 0 or y == h - 1)
+			if is_edge:
+				img.set_pixel(x, y, outer_dark)
+			else:
+				if is_active:
+					# Golden battery / bullet capsule (Ref Image 1)
+					if y == 1 and x < w - 2:
+						img.set_pixel(x, y, Color(1.0, 1.0, 0.85, 1.0)) # Gloss highlight
+					elif x == 1:
+						img.set_pixel(x, y, Color(1.0, 0.92, 0.4, 1.0))
+					elif y == h - 2 or x == w - 2:
+						img.set_pixel(x, y, Color(0.65, 0.42, 0.05, 1.0)) # Shadow
+					else:
+						img.set_pixel(x, y, Color(1.0, 0.82, 0.18, 1.0)) # Rich gold
+				else:
+					# Inactive dark slate socket
+					if y == 1 or x == 1:
+						img.set_pixel(x, y, Color(0.08, 0.12, 0.16, 1.0))
+					else:
+						img.set_pixel(x, y, Color(0.14, 0.18, 0.24, 1.0))
+
+	var tex = ImageTexture.create_from_image(img)
+	_cell_cache[key] = tex
+	return tex
+
+static var _mech_cache: Dictionary = {}
+
+static func create_mech_reactor_pod_texture(border_col: Color, bg_col: Color) -> ImageTexture:
+	var key = "pod_%s_%s" % [border_col.to_html(), bg_col.to_html()]
+	if _mech_cache.has(key):
+		return _mech_cache[key]
+
+	var size = 48
+	var img = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	var outer_dark = Color(0.01, 0.02, 0.04, 0.98)
+	var steel_hi = Color(0.28, 0.38, 0.52, 1.0)
+	var steel_body = Color(0.14, 0.18, 0.26, 1.0)
+	var steel_sh = Color(0.06, 0.08, 0.12, 1.0)
+
+	# 1. Fill base with heavy steel slate
+	for y in range(size):
+		for x in range(size):
+			var cut = (x + y < 4) or (x - y > size - 5) or (y - x > size - 5) or (x + y > size * 2 - 6)
+			if not cut:
+				img.set_pixel(x, y, steel_body)
+
+	# 2. Beveled outer edge
+	for i in range(4, size - 4):
+		img.set_pixel(i, 0, outer_dark)
+		img.set_pixel(i, 1, steel_hi)
+		img.set_pixel(0, i, outer_dark)
+		img.set_pixel(1, i, steel_hi)
+		img.set_pixel(i, size - 1, outer_dark)
+		img.set_pixel(i, size - 2, steel_sh)
+		img.set_pixel(size - 1, i, outer_dark)
+		img.set_pixel(size - 2, i, steel_sh)
+
+	# 3. Corner Rivets / Screws
+	var rivets = [Vector2i(4, 4), Vector2i(size - 6, 4), Vector2i(4, size - 6), Vector2i(size - 6, size - 6)]
+	for r in rivets:
+		img.set_pixel(r.x, r.y, Color(1.0, 1.0, 1.0, 1.0))
+		img.set_pixel(r.x + 1, r.y, Color(0.6, 0.7, 0.8, 1.0))
+		img.set_pixel(r.x, r.y + 1, Color(0.4, 0.5, 0.6, 1.0))
+		img.set_pixel(r.x + 1, r.y + 1, outer_dark)
+
+	# 4. Central Recessed Reactor Core Chamber (Circular Pod)
+	var center = Vector2(size * 0.5, size * 0.5)
+	for y in range(8, size - 8):
+		for x in range(8, size - 8):
+			var d = (Vector2(x, y) - center).length()
+			if d <= 15.0:
+				if d >= 13.5:
+					# Inner metal rim
+					img.set_pixel(x, y, border_col * 0.8)
+				elif d >= 12.0:
+					# Dark recessed ring
+					img.set_pixel(x, y, outer_dark)
+				else:
+					# Core glow chamber
+					var glow = 1.0 - (d / 12.0)
+					var col = bg_col.lerp(border_col * 0.35, glow)
+					img.set_pixel(x, y, col)
+
+	var tex = ImageTexture.create_from_image(img)
+	_mech_cache[key] = tex
+	return tex
+
+static var _crt_cache: Dictionary = {}
+
+static func create_industrial_crt_frame(border_col: Color, bg_col: Color) -> ImageTexture:
+	var key = "crt_%s_%s" % [border_col.to_html(), bg_col.to_html()]
+	if _crt_cache.has(key):
+		return _crt_cache[key]
+
+	var size = 32
+	var img = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	img.fill(bg_col)
+
+	var outer_dark = Color(0.01, 0.02, 0.04, 1.0)
+	var steel_hi = Color(0.28, 0.38, 0.52, 1.0)
+	var steel_mid = Color(0.14, 0.18, 0.26, 1.0)
+	var steel_sh = Color(0.06, 0.08, 0.12, 1.0)
+
+	# 1. 3px Heavy Bezel (Ref Image 2)
+	for i in range(size):
+		img.set_pixel(i, 0, outer_dark)
+		img.set_pixel(i, size - 1, outer_dark)
+		img.set_pixel(0, i, outer_dark)
+		img.set_pixel(size - 1, i, outer_dark)
+
+		img.set_pixel(i, 1, steel_hi)
+		img.set_pixel(1, i, steel_hi)
+		img.set_pixel(i, size - 2, steel_sh)
+		img.set_pixel(size - 2, i, steel_sh)
+
+		img.set_pixel(i, 2, steel_mid)
+		img.set_pixel(2, i, steel_mid)
+		img.set_pixel(i, size - 3, steel_mid)
+		img.set_pixel(size - 3, i, steel_mid)
+
+	# 2. Inner 1px neon trim line
+	for i in range(3, size - 3):
+		img.set_pixel(i, 3, border_col)
+		img.set_pixel(3, i, border_col)
+		img.set_pixel(i, size - 4, border_col * 0.7)
+		img.set_pixel(size - 4, i, border_col * 0.7)
+
+	# 3. Subtle CRT diagonal scratch marks across glass
+	for d in range(6, size - 6):
+		if d % 5 == 0:
+			img.set_pixel(d, d, Color(1.0, 1.0, 1.0, 0.08))
+			if d + 1 < size - 6:
+				img.set_pixel(d + 1, d, Color(1.0, 1.0, 1.0, 0.05))
+
+	var tex = ImageTexture.create_from_image(img)
+	_crt_cache[key] = tex
+	return tex
+
+static var _btn_cache: Dictionary = {}
+
+static func create_industrial_button_texture(border_col: Color, bg_col: Color, is_pressed: bool = false, is_hover: bool = false) -> ImageTexture:
+	var key = "ibtn_%s_%s_%s_%s" % [border_col.to_html(), bg_col.to_html(), str(is_pressed), str(is_hover)]
+	if _btn_cache.has(key):
+		return _btn_cache[key]
+
+	var size = 20
+	var img = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var cur_bg = bg_col.lightened(0.1) if is_hover else bg_col
+	img.fill(cur_bg)
+
+	var outer_dark = Color(0.01, 0.02, 0.04, 1.0)
+	var hi = Color(1.0, 1.0, 1.0, 0.95) if is_hover else Color(0.35, 0.48, 0.65, 1.0)
+	var sh = outer_dark if is_pressed else Color(0.04, 0.06, 0.10, 1.0)
+
+	# 1px Outer dark
+	for i in range(size):
+		img.set_pixel(i, 0, outer_dark)
+		img.set_pixel(i, size - 1, outer_dark)
+		img.set_pixel(0, i, outer_dark)
+		img.set_pixel(size - 1, i, outer_dark)
+
+	# 2px Deep Mechanical Raised Bevel / Pressed Inset (Ref Image 2)
+	var top_col = sh if is_pressed else hi
+	var bot_col = hi if is_pressed else sh
+
+	for i in range(1, size - 1):
+		img.set_pixel(i, 1, top_col)
+		img.set_pixel(1, i, top_col)
+		img.set_pixel(i, size - 2, bot_col)
+		img.set_pixel(size - 2, i, bot_col)
+
+		img.set_pixel(i, 2, top_col * 0.8)
+		img.set_pixel(2, i, top_col * 0.8)
+		img.set_pixel(i, size - 3, bot_col * 0.8)
+		img.set_pixel(size - 3, i, bot_col * 0.8)
+
+	var tex = ImageTexture.create_from_image(img)
+	_btn_cache[key] = tex
+	return tex
+
+static func create_close_btn_texture(is_hover: bool = false) -> ImageTexture:
+	var key = "close_btn_%s" % str(is_hover)
+	if _btn_cache.has(key):
+		return _btn_cache[key]
+
+	var size = 18
+	var img = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var bg = Color(0.9, 0.22, 0.26, 1.0) if is_hover else Color(0.72, 0.12, 0.16, 1.0)
+	img.fill(bg)
+
+	var outer_dark = Color(0.01, 0.02, 0.04, 1.0)
+	for i in range(size):
+		img.set_pixel(i, 0, outer_dark)
+		img.set_pixel(i, size - 1, outer_dark)
+		img.set_pixel(0, i, outer_dark)
+		img.set_pixel(size - 1, i, outer_dark)
+
+		img.set_pixel(i, 1, Color(1.0, 0.6, 0.6, 1.0) if is_hover else Color(0.9, 0.4, 0.4, 1.0))
+		img.set_pixel(1, i, Color(1.0, 0.6, 0.6, 1.0) if is_hover else Color(0.9, 0.4, 0.4, 1.0))
+		img.set_pixel(i, size - 2, Color(0.35, 0.05, 0.08, 1.0))
+		img.set_pixel(size - 2, i, Color(0.35, 0.05, 0.08, 1.0))
+
+	# Crisp White 'X' in center (Ref Image 2)
+	for p in range(4, size - 4):
+		img.set_pixel(p, p, Color(1.0, 1.0, 1.0, 1.0))
+		img.set_pixel(p + 1, p, Color(1.0, 1.0, 1.0, 1.0))
+		img.set_pixel(size - 1 - p, p, Color(1.0, 1.0, 1.0, 1.0))
+		img.set_pixel(size - 2 - p, p, Color(1.0, 1.0, 1.0, 1.0))
+
+	var tex = ImageTexture.create_from_image(img)
+	_btn_cache[key] = tex
+	return tex
+
+

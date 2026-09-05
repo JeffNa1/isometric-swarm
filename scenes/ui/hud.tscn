@@ -145,44 +145,66 @@ grow_vertical = 0
 
 [node name="HealthChassis" type="PanelContainer" parent="BottomBar"]
 layout_mode = 1
-offset_left = 20.0
-offset_top = 10.0
-offset_right = 330.0
-offset_bottom = 68.0
+offset_left = 16.0
+offset_top = 6.0
+offset_right = 376.0
+offset_bottom = 74.0
 
-[node name="VBox" type="VBoxContainer" parent="BottomBar/HealthChassis"]
+[node name="ChassisLayout" type="HBoxContainer" parent="BottomBar/HealthChassis"]
 layout_mode = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 8
 
-[node name="HPHeader" type="HBoxContainer" parent="BottomBar/HealthChassis/VBox"]
+[node name="ReactorPod" type="PanelContainer" parent="BottomBar/HealthChassis/ChassisLayout"]
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="CenterContainer" type="CenterContainer" parent="BottomBar/HealthChassis/ChassisLayout/ReactorPod"]
 layout_mode = 2
 
-[node name="CoreIcon" type="Label" parent="BottomBar/HealthChassis/VBox/HPHeader"]
+[node name="HeartIcon" type="Label" parent="BottomBar/HealthChassis/ChassisLayout/ReactorPod/CenterContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.3, 0.45, 1)
-theme_override_font_sizes/font_size = 12
-text = "❤️ NĂNG LƯỢNG LÕI"
+theme_override_colors/font_color = Color(1, 0.25, 0.4, 1)
+theme_override_font_sizes/font_size = 20
+text = "❤️"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="HPPercent" type="Label" parent="BottomBar/HealthChassis/VBox/HPHeader"]
+[node name="GaugeColumn" type="VBoxContainer" parent="BottomBar/HealthChassis/ChassisLayout"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="HPHeader" type="HBoxContainer" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn"]
+layout_mode = 2
+
+[node name="CoreLabel" type="Label" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn/HPHeader"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 11
+text = "LÕI NĂNG LƯỢNG"
+
+[node name="HPPercent" type="Label" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn/HPHeader"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.3, 1, 0.6, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 11
 text = "100%"
 horizontal_alignment = 1
 
-[node name="HPLabel" type="Label" parent="BottomBar/HealthChassis/VBox/HPHeader"]
+[node name="HPLabel" type="Label" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn/HPHeader"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.98, 1, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 11
 text = "120 / 120 HP"
 horizontal_alignment = 2
 
-[node name="BarStack" type="Control" parent="BottomBar/HealthChassis/VBox"]
+[node name="BarStack" type="Control" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn"]
 custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 
-[node name="GhostHPBar" type="ProgressBar" parent="BottomBar/HealthChassis/VBox/BarStack"]
+[node name="GhostHPBar" type="ProgressBar" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn/BarStack"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -192,7 +214,7 @@ grow_vertical = 2
 value = 100.0
 show_percentage = false
 
-[node name="HPBar" type="ProgressBar" parent="BottomBar/HealthChassis/VBox/BarStack"]
+[node name="HPBar" type="ProgressBar" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn/BarStack"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -201,13 +223,27 @@ grow_horizontal = 2
 grow_vertical = 2
 value = 100.0
 show_percentage = false
+
+[node name="BatteryRow" type="HBoxContainer" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="BatteryIcon" type="Label" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn/BatteryRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 10
+text = "⚡ CELL:"
+
+[node name="BatteryCells" type="HBoxContainer" parent="BottomBar/HealthChassis/ChassisLayout/GaugeColumn/BatteryRow"]
+layout_mode = 2
+theme_override_constants/separation = 3
 
 [node name="InventoryTray" type="PanelContainer" parent="BottomBar"]
 layout_mode = 1
-offset_left = 346.0
-offset_top = 10.0
-offset_right = 840.0
-offset_bottom = 68.0
+offset_left = 390.0
+offset_top = 6.0
+offset_right = 880.0
+offset_bottom = 74.0
 
 [node name="InventoryBox" type="HBoxContainer" parent="BottomBar/InventoryTray"]
 layout_mode = 2

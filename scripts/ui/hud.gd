@@ -12,10 +12,13 @@ signal upgrade_selected(upgrade_id: String)
 @onready var swarm_label: Label = $TopBar/SwarmLabel
 
 @onready var health_chassis: PanelContainer = $BottomBar/HealthChassis
-@onready var hp_bar: ProgressBar = $BottomBar/HealthChassis/VBox/BarStack/HPBar
-@onready var ghost_hp_bar: ProgressBar = $BottomBar/HealthChassis/VBox/BarStack/GhostHPBar
-@onready var hp_label: Label = $BottomBar/HealthChassis/VBox/HPHeader/HPLabel
-@onready var hp_percent_label: Label = $BottomBar/HealthChassis/VBox/HPHeader/HPPercent
+@onready var reactor_pod: PanelContainer = $BottomBar/HealthChassis/ChassisLayout/ReactorPod
+@onready var heart_icon: Label = $BottomBar/HealthChassis/ChassisLayout/ReactorPod/CenterContainer/HeartIcon
+@onready var hp_bar: ProgressBar = $BottomBar/HealthChassis/ChassisLayout/GaugeColumn/BarStack/HPBar
+@onready var ghost_hp_bar: ProgressBar = $BottomBar/HealthChassis/ChassisLayout/GaugeColumn/BarStack/GhostHPBar
+@onready var hp_label: Label = $BottomBar/HealthChassis/ChassisLayout/GaugeColumn/HPHeader/HPLabel
+@onready var hp_percent_label: Label = $BottomBar/HealthChassis/ChassisLayout/GaugeColumn/HPHeader/HPPercent
+@onready var battery_cells_box: HBoxContainer = $BottomBar/HealthChassis/ChassisLayout/GaugeColumn/BatteryRow/BatteryCells
 @onready var inventory_tray: PanelContainer = $BottomBar/InventoryTray
 @onready var inventory_box: HBoxContainer = $BottomBar/InventoryTray/InventoryBox
 @onready var low_hp_overlay: ColorRect = $LowHPOverlay
@@ -104,31 +107,45 @@ func _setup_hud_styling() -> void:
 	var xp_bg_tex = SpriteFactory.create_pixel_bar_bg_texture(Color(0.02, 0.04, 0.08, 0.95), Color(0.15, 0.35, 0.55, 0.8))
 	xp_bar.add_theme_stylebox_override("background", SpriteFactory.create_pixel_stylebox(xp_bg_tex, 3))
 
-	var xp_fill_tex = SpriteFactory.create_pixel_bar_fill_texture(Color(0.2, 0.9, 1.0, 1.0))
+	var xp_fill_tex = SpriteFactory.create_glossy_plasma_fluid_texture(Color(0.2, 0.9, 1.0, 1.0))
 	xp_bar.add_theme_stylebox_override("fill", SpriteFactory.create_pixel_bar_stylebox(xp_fill_tex))
 
-	# 2. Health Chassis Panel (Chunky Pixel Armor Frame with Rivet Bolts)
+	# 2. Health Chassis Panel (Industrial Mech Frame with Left Reactor Core Pod - Ref Image 1)
 	if health_chassis:
 		var ch_tex = SpriteFactory.create_pixel_panel_texture(Color(0.25, 0.6, 0.9, 0.95), Color(0.03, 0.06, 0.12, 0.96), Color(0.4, 0.9, 1.0, 1.0), true)
 		health_chassis.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(ch_tex, 6))
+
+	if reactor_pod:
+		var pod_tex = SpriteFactory.create_mech_reactor_pod_texture(Color(1.0, 0.25, 0.4), Color(0.08, 0.03, 0.05))
+		reactor_pod.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(pod_tex, 4))
+
+	# Populate Golden Energy Battery Cells (Ref Image 1)
+	if battery_cells_box:
+		for child in battery_cells_box.get_children():
+			child.queue_free()
+		for i in range(8):
+			var cell = TextureRect.new()
+			cell.texture = SpriteFactory.create_energy_cell_texture(true)
+			cell.custom_minimum_size = Vector2(8, 12)
+			battery_cells_box.add_child(cell)
 
 	# 3. Inventory Tray Panel (Recessed Cyber Module Plate)
 	if inventory_tray:
 		var tray_tex = SpriteFactory.create_pixel_panel_texture(Color(0.18, 0.38, 0.65, 0.85), Color(0.02, 0.05, 0.10, 0.92), Color(0.25, 0.7, 1.0, 0.8), false)
 		inventory_tray.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(tray_tex, 6))
 
-	# 4. HP Bar Style (Recessed Track + Segmented LED Block Fill)
-	var hp_bg_tex = SpriteFactory.create_pixel_bar_bg_texture(Color(0.02, 0.03, 0.06, 0.98), Color(0.12, 0.28, 0.45, 0.9))
+	# 4. HP Bar Style (Glossy Plasma Fluid inside Glass Cylinder - Ref Image 1)
+	var hp_bg_tex = SpriteFactory.create_pixel_bar_bg_texture(Color(0.01, 0.02, 0.05, 0.98), Color(0.15, 0.3, 0.48, 0.95))
 	hp_bar.add_theme_stylebox_override("background", SpriteFactory.create_pixel_stylebox(hp_bg_tex, 3))
 
-	var hp_fill_tex = SpriteFactory.create_pixel_bar_fill_texture(Color(0.18, 0.95, 0.45, 1.0))
+	var hp_fill_tex = SpriteFactory.create_glossy_plasma_fluid_texture(Color(0.18, 0.95, 0.45, 1.0))
 	hp_bar.add_theme_stylebox_override("fill", SpriteFactory.create_pixel_bar_stylebox(hp_fill_tex))
 
-	# 5. Ghost HP Bar Style (Lagging Amber Notches)
+	# 5. Ghost HP Bar Style (Lagging Amber Plasma Trail)
 	if ghost_hp_bar:
 		var g_bg = StyleBoxEmpty.new()
 		ghost_hp_bar.add_theme_stylebox_override("background", g_bg)
-		var g_fill_tex = SpriteFactory.create_pixel_bar_fill_texture(Color(1.0, 0.72, 0.15, 0.9))
+		var g_fill_tex = SpriteFactory.create_glossy_plasma_fluid_texture(Color(1.0, 0.72, 0.15, 0.9), true)
 		ghost_hp_bar.add_theme_stylebox_override("fill", SpriteFactory.create_pixel_bar_stylebox(g_fill_tex))
 
 	# 6. Boss Bar Style
@@ -136,18 +153,37 @@ func _setup_hud_styling() -> void:
 		var b_bg_tex = SpriteFactory.create_pixel_bar_bg_texture(Color(0.1, 0.02, 0.03, 0.98), Color(0.8, 0.15, 0.25, 0.9))
 		boss_hp_bar.add_theme_stylebox_override("background", SpriteFactory.create_pixel_stylebox(b_bg_tex, 3))
 
-		var b_fill_tex = SpriteFactory.create_pixel_bar_fill_texture(Color(1.0, 0.18, 0.28, 1.0), Color(0.2, 0.02, 0.04, 1.0))
+		var b_fill_tex = SpriteFactory.create_glossy_plasma_fluid_texture(Color(1.0, 0.18, 0.28, 1.0))
 		boss_hp_bar.add_theme_stylebox_override("fill", SpriteFactory.create_pixel_bar_stylebox(b_fill_tex))
 
-	# 7. Dialog Modals (Level-Up, Pause, Game Over in 9-Slice Pixel Frame)
-	var modal_tex = SpriteFactory.create_pixel_panel_texture(Color(0.25, 0.8, 1.0, 0.95), Color(0.03, 0.06, 0.13, 0.98), Color(1.0, 0.85, 0.25, 1.0), true)
-	var modal_style = SpriteFactory.create_pixel_stylebox(modal_tex, 6)
+	# 7. Dialog Modals (Industrial CRT Bezel with Exposed Cables & Header Plate - Ref Image 2)
+	var modal_tex = SpriteFactory.create_industrial_crt_frame(Color(0.25, 0.8, 1.0, 0.95), Color(0.05, 0.08, 0.14, 0.98))
+	var modal_style = SpriteFactory.create_pixel_stylebox(modal_tex, 8)
 	level_up_panel.add_theme_stylebox_override("panel", modal_style)
 	if pause_modal:
 		pause_modal.add_theme_stylebox_override("panel", modal_style)
+		_style_industrial_btn(pause_modal.get_node_or_null("VBox/ResumeButton"), Color(0.2, 0.9, 0.5), Color(0.05, 0.14, 0.08, 0.95))
+		_style_industrial_btn(pause_modal.get_node_or_null("VBox/PauseRestartButton"), Color(1.0, 0.75, 0.2), Color(0.14, 0.10, 0.03, 0.95))
+		_style_industrial_btn(pause_modal.get_node_or_null("VBox/PauseMenuButton"), Color(0.4, 0.7, 1.0), Color(0.06, 0.10, 0.18, 0.95))
 	if game_over_panel:
-		var go_tex = SpriteFactory.create_pixel_panel_texture(Color(1.0, 0.2, 0.3, 0.95), Color(0.10, 0.03, 0.05, 0.98), Color(1.0, 0.3, 0.3, 1.0), true)
-		game_over_panel.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(go_tex, 6))
+		var go_tex = SpriteFactory.create_industrial_crt_frame(Color(1.0, 0.2, 0.3, 0.95), Color(0.12, 0.04, 0.06, 0.98))
+		game_over_panel.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(go_tex, 8))
+		_style_industrial_btn(game_over_panel.get_node_or_null("VBox/ButtonsRow/RetryButton"), Color(1.0, 0.3, 0.3), Color(0.16, 0.04, 0.06, 0.95))
+		_style_industrial_btn(game_over_panel.get_node_or_null("VBox/ButtonsRow/MenuButton"), Color(0.4, 0.7, 1.0), Color(0.06, 0.10, 0.18, 0.95))
+	if chest_modal:
+		var ch_modal_tex = SpriteFactory.create_industrial_crt_frame(Color(1.0, 0.85, 0.25, 0.95), Color(0.14, 0.08, 0.02, 0.98))
+		chest_modal.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(ch_modal_tex, 8))
+		_style_industrial_btn(chest_modal.get_node_or_null("VBox/ClaimButton"), Color(1.0, 0.85, 0.25), Color(0.18, 0.12, 0.03, 0.95))
+
+func _style_industrial_btn(btn: Button, border_col: Color, bg_col: Color) -> void:
+	if not btn: return
+	var norm_tex = SpriteFactory.create_industrial_button_texture(border_col, bg_col, false, false)
+	var hov_tex = SpriteFactory.create_industrial_button_texture(Color.WHITE, bg_col.lightened(0.15), false, true)
+	var press_tex = SpriteFactory.create_industrial_button_texture(border_col, bg_col.darkened(0.2), true, false)
+	btn.add_theme_stylebox_override("normal", SpriteFactory.create_pixel_stylebox(norm_tex, 4))
+	btn.add_theme_stylebox_override("hover", SpriteFactory.create_pixel_stylebox(hov_tex, 4))
+	btn.add_theme_stylebox_override("pressed", SpriteFactory.create_pixel_stylebox(press_tex, 4))
+	btn.add_theme_stylebox_override("focus", SpriteFactory.create_pixel_stylebox(hov_tex, 4))
 
 func _create_surge_banner() -> void:
 	surge_banner = Label.new()
@@ -208,6 +244,11 @@ func _process(delta: float) -> void:
 				health_chassis.position = health_chassis_base_pos + Vector2(rx, ry)
 			else:
 				health_chassis.position = health_chassis_base_pos
+
+		# Reactor pod heart pulsation
+		if heart_icon:
+			var beat = (int(Time.get_ticks_msec() / 250) % 2)
+			heart_icon.modulate = Color(1.4, 0.5, 0.6, 1.0) if beat == 1 else Color(1.0, 0.25, 0.4, 1.0)
 
 		# Pixel segmented health bar & ghost trail
 		hp_bar.value = round(lerp(float(hp_bar.value), target_hp, 16.0 * delta))
@@ -352,9 +393,17 @@ func update_health(current: float, maximum: float) -> void:
 
 	var fill_style = hp_bar.get_theme_stylebox("fill")
 	if fill_style is StyleBoxTexture:
-		fill_style.texture = SpriteFactory.create_pixel_bar_fill_texture(col)
+		fill_style.texture = SpriteFactory.create_glossy_plasma_fluid_texture(col)
 	elif fill_style is StyleBoxFlat:
 		fill_style.bg_color = col
+
+	if battery_cells_box:
+		var cells = battery_cells_box.get_children()
+		var active_count = int(ceil(pct * cells.size()))
+		for i in range(cells.size()):
+			var c = cells[i] as TextureRect
+			if c:
+				c.texture = SpriteFactory.create_energy_cell_texture(i < active_count)
 
 func update_xp(current: int, target: int, lvl: int) -> void:
 	xp_bar.max_value = target
@@ -500,10 +549,10 @@ func _create_hologram_card(item: Dictionary) -> PanelContainer:
 			else:
 				cat_name = "⚡ CƯỜNG HÓA VŨ KHÍ"
 
-	var card_tex_normal = SpriteFactory.create_pixel_panel_texture(glow_col, bg_col, glow_col, true)
-	var card_tex_hover = SpriteFactory.create_pixel_panel_texture(Color(1.0, 1.0, 1.0, 1.0), bg_col.lightened(0.06), Color(1.0, 1.0, 1.0, 1.0), true)
-	var card_style_normal = SpriteFactory.create_pixel_stylebox(card_tex_normal, 6)
-	var card_style_hover = SpriteFactory.create_pixel_stylebox(card_tex_hover, 6)
+	var card_tex_normal = SpriteFactory.create_industrial_crt_frame(glow_col, bg_col)
+	var card_tex_hover = SpriteFactory.create_industrial_crt_frame(Color(1.0, 1.0, 1.0, 1.0), bg_col.lightened(0.06))
+	var card_style_normal = SpriteFactory.create_pixel_stylebox(card_tex_normal, 8)
+	var card_style_hover = SpriteFactory.create_pixel_stylebox(card_tex_hover, 8)
 
 	card.add_theme_stylebox_override("panel", card_style_normal)
 
@@ -618,14 +667,7 @@ func _create_hologram_card(item: Dictionary) -> PanelContainer:
 	btn_action.add_theme_font_size_override("font_size", 13)
 	btn_action.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
-	var btn_norm_tex = SpriteFactory.create_pixel_button_texture(glow_col, Color(0.06, 0.12, 0.22, 0.95), false, false)
-	btn_action.add_theme_stylebox_override("normal", SpriteFactory.create_pixel_stylebox(btn_norm_tex, 4))
-
-	var btn_hov_tex = SpriteFactory.create_pixel_button_texture(Color(1, 1, 1), Color(glow_col.r * 0.35, glow_col.g * 0.35, glow_col.b * 0.35, 1.0), false, true)
-	btn_action.add_theme_stylebox_override("hover", SpriteFactory.create_pixel_stylebox(btn_hov_tex, 4))
-
-	var btn_press_tex = SpriteFactory.create_pixel_button_texture(glow_col, Color(0.02, 0.05, 0.1, 1.0), true, false)
-	btn_action.add_theme_stylebox_override("pressed", SpriteFactory.create_pixel_stylebox(btn_press_tex, 4))
+	_style_industrial_btn(btn_action, glow_col, Color(0.06, 0.12, 0.22, 0.95))
 
 	vbox.add_child(btn_action)
 
