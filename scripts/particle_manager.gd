@@ -13,6 +13,12 @@ var p_type: PackedInt32Array = PackedInt32Array() # 0: Blood drop, 1: Shard, 2: 
 
 var active_count: int = 0
 var ground_canvas: Node2D = null
+var player_ref: Node2D = null
+
+func _get_player() -> void:
+	var cur = get_tree().current_scene
+	if cur:
+		player_ref = cur.get_node_or_null("Entities/Player")
 
 func _ready() -> void:
 	z_as_relative = false
@@ -231,10 +237,17 @@ func _process(delta: float) -> void:
 func _on_ground_draw() -> void:
 	if not is_instance_valid(ground_canvas):
 		return
+	if not is_instance_valid(player_ref):
+		_get_player()
+	var p_pos_ref = player_ref.global_position if is_instance_valid(player_ref) else Vector2.ZERO
+
 	ground_canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.5))
 	for i in range(active_count):
 		var ptype = p_type[i]
 		if ptype == 0 or ptype == 3:
+			# Cull off-screen ground decals (> 1250px)
+			if (p_pos[i] - p_pos_ref).length_squared() > 1562500.0:
+				continue
 			var alpha = clamp(p_life[i] / p_max_life[i], 0.0, 1.0)
 			var c = p_color[i]
 			c.a *= alpha
@@ -243,9 +256,13 @@ func _on_ground_draw() -> void:
 	ground_canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw() -> void:
+	var p_pos_ref = player_ref.global_position if is_instance_valid(player_ref) else Vector2.ZERO
 	for i in range(active_count):
 		var ptype = p_type[i]
 		if ptype != 0 and ptype != 3:
+			# Cull off-screen air particles (> 1250px)
+			if (p_pos[i] - p_pos_ref).length_squared() > 1562500.0:
+				continue
 			var alpha = clamp(p_life[i] / p_max_life[i], 0.0, 1.0)
 			var c = p_color[i]
 			c.a *= alpha

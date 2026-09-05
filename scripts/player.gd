@@ -22,8 +22,8 @@ var xp_to_next: int = 73
 var walk_cycle: float = 0.0
 var facing_right: bool = true
 var is_invulnerable: bool = false
-var invuln_timer: float = 0.0
 var hurt_flash_timer: float = 0.0
+var hurt_sfx_timer: float = 0.0
 
 var sound_mgr: Node = null
 var camera_node: Camera2D = null
@@ -118,10 +118,8 @@ func trigger_overclock(duration: float = 10.0) -> void:
 		particle_mgr.spawn_sparks(global_position, Color(3.5, 3.0, 0.4, 1.0), 20)
 
 func _physics_process(delta: float) -> void:
-	if is_invulnerable:
-		invuln_timer -= delta
-		if invuln_timer <= 0.0:
-			is_invulnerable = false
+	if hurt_sfx_timer > 0.0:
+		hurt_sfx_timer -= delta
 
 	if overclock_timer > 0.0:
 		overclock_timer -= delta
@@ -130,10 +128,6 @@ func _physics_process(delta: float) -> void:
 
 	if hurt_flash_timer > 0.0:
 		hurt_flash_timer -= delta
-		queue_redraw()
-
-	if invuln_timer > 0.0:
-		invuln_timer -= delta
 		queue_redraw()
 
 	if recoil_offset.length_squared() > 0.001:
@@ -181,24 +175,22 @@ func trigger_hit_stop(duration: float = 0.035) -> void:
 	get_tree().paused = false
 
 func take_damage(amount: float) -> void:
-	if current_health <= 0.0 or invuln_timer > 0.0:
+	if current_health <= 0.0:
 		return
 
-	invuln_timer = 0.28
-	hurt_flash_timer = 0.18
 	current_health = max(0.0, current_health - amount)
 	health_changed.emit(current_health, max_health)
 
-	if not sound_mgr:
-		_get_managers()
-
-	if sound_mgr and sound_mgr.has_method("play_hit"):
-		sound_mgr.play_hit()
-
-	if camera_node and camera_node.has_method("add_trauma"):
-		camera_node.add_trauma(0.26)
-
-	queue_redraw()
+	if hurt_sfx_timer <= 0.0:
+		hurt_sfx_timer = 0.14
+		hurt_flash_timer = 0.12
+		if not sound_mgr:
+			_get_managers()
+		if sound_mgr and sound_mgr.has_method("play_hit"):
+			sound_mgr.play_hit()
+		if camera_node and camera_node.has_method("add_trauma"):
+			camera_node.add_trauma(0.20)
+		queue_redraw()
 
 	if current_health <= 0.0:
 		player_died.emit()
@@ -347,9 +339,6 @@ func _draw() -> void:
 	var tex = player_frames[clampi(active_frame, 0, player_frames.size() - 1)]
 	var flip = 1.0 if facing_right else -1.0
 	var col = Color(5.0, 1.5, 1.5, 1.0) if hurt_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, 1.0)
-	if invuln_timer > 0.0:
-		var flick = (int(Time.get_ticks_msec() / 45) % 2) == 0
-		col.a = 0.35 if flick else 0.95
 
 	draw_set_transform(recoil_offset, 0.0, Vector2(flip, 1.0))
 	draw_texture(tex, Vector2(-24.0, -41.0), col)

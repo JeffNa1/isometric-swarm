@@ -251,7 +251,7 @@ func _physics_process(delta: float) -> void:
 					var scuttle = sin(ticks * 16.0 + float(i) * 1.5) * 0.18
 					rot = velocities[i].angle() + PI * 0.5 + scuttle
 		else:
-			rot = velocities[i].angle() + PI * 0.5
+			rot = 0.0
 
 		var t = Transform2D(rot, Vector2.ONE, 0.0, positions[i])
 		match t_type:

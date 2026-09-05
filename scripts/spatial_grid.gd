@@ -65,21 +65,23 @@ func get_nearby(pos: Vector2, search_radius: float) -> Array[int]:
 				curr = entity_next[curr]
 	return result
 
+const ADJ_DX: PackedInt32Array = [0, -1, 0, 1, -1, 1, -1, 0, 1]
+const ADJ_DY: PackedInt32Array = [0, -1, -1, -1, 0, 0, 1, 1, 1]
+
 func get_in_cell_and_adjacent(pos: Vector2) -> Array[int]:
 	var cx: int = int(floor(pos.x * inv_cell_size))
 	var cy: int = int(floor(pos.y * inv_cell_size))
 	var result: Array[int] = []
 
-	for ox in range(-1, 2):
-		var ncx: int = cx + ox
-		for oy in range(-1, 2):
-			var ncy: int = cy + oy
-			var h: int = ((ncx * 73856093) ^ (ncy * 19349663)) & TABLE_MASK
-			var curr: int = cell_head[h]
-			while curr != -1:
-				if entity_cell_x[curr] == ncx and entity_cell_y[curr] == ncy:
-					result.append(curr)
-				curr = entity_next[curr]
+	for n in 9:
+		var ncx: int = cx + ADJ_DX[n]
+		var ncy: int = cy + ADJ_DY[n]
+		var h: int = ((ncx * 73856093) ^ (ncy * 19349663)) & TABLE_MASK
+		var curr: int = cell_head[h]
+		while curr != -1:
+			if entity_cell_x[curr] == ncx and entity_cell_y[curr] == ncy:
+				result.append(curr)
+			curr = entity_next[curr]
 	return result
 
 func get_neighbors_capped(pos: Vector2, max_count: int = 6) -> Array[int]:
@@ -87,16 +89,15 @@ func get_neighbors_capped(pos: Vector2, max_count: int = 6) -> Array[int]:
 	var cy: int = int(floor(pos.y * inv_cell_size))
 	var result: Array[int] = []
 
-	for ox in range(-1, 2):
-		var ncx: int = cx + ox
-		for oy in range(-1, 2):
-			var ncy: int = cy + oy
-			var h: int = ((ncx * 73856093) ^ (ncy * 19349663)) & TABLE_MASK
-			var curr: int = cell_head[h]
-			while curr != -1:
-				if entity_cell_x[curr] == ncx and entity_cell_y[curr] == ncy:
-					result.append(curr)
-					if result.size() >= max_count:
-						return result
-				curr = entity_next[curr]
+	for n in 9:
+		var ncx: int = cx + ADJ_DX[n]
+		var ncy: int = cy + ADJ_DY[n]
+		var h: int = ((ncx * 73856093) ^ (ncy * 19349663)) & TABLE_MASK
+		var curr: int = cell_head[h]
+		while curr != -1:
+			if entity_cell_x[curr] == ncx and entity_cell_y[curr] == ncy:
+				result.append(curr)
+				if result.size() >= max_count:
+					return result
+			curr = entity_next[curr]
 	return result
