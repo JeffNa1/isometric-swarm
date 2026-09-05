@@ -63,6 +63,13 @@ var pending_chest_rewards: Array[String] = []
 var surge_banner: Label = null
 var surge_banner_timer: float = 0.0
 
+var combo_badge: PanelContainer = null
+var combo_label: Label = null
+var combo_scale: float = 1.0
+
+var milestone_banner: Label = null
+var milestone_timer: float = 0.0
+
 var active_card_scales: Dictionary = {}
 var active_card_targets: Dictionary = {}
 
@@ -100,6 +107,7 @@ func _ready() -> void:
 	radar_rect.draw.connect(_on_radar_draw)
 
 	_create_surge_banner()
+	_create_combo_elements()
 	call_deferred("update_inventory")
 
 func _setup_hud_styling() -> void:
@@ -202,6 +210,85 @@ func _create_surge_banner() -> void:
 	surge_banner.hide()
 	add_child(surge_banner)
 
+func _create_combo_elements() -> void:
+	# 1. Floating Combo Meter Badge (Top Right below TopBar)
+	combo_badge = PanelContainer.new()
+	combo_badge.name = "ComboBadge"
+	combo_badge.custom_minimum_size = Vector2(160, 36)
+	combo_badge.position = Vector2(1090, 75)
+	combo_badge.pivot_offset = Vector2(80, 18)
+	var c_tex = SpriteFactory.create_pixel_panel_texture(Color(1.0, 0.7, 0.2, 0.95), Color(0.08, 0.04, 0.02, 0.95), Color(1.0, 0.85, 0.3, 1.0), true)
+	combo_badge.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(c_tex, 4))
+
+	combo_label = Label.new()
+	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	combo_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	combo_label.add_theme_font_size_override("font_size", 14)
+	combo_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 1.0))
+	combo_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	combo_label.add_theme_constant_override("shadow_offset_x", 1)
+	combo_label.add_theme_constant_override("shadow_offset_y", 1)
+	combo_label.text = "🔥 x0 COMBO"
+	combo_badge.add_child(combo_label)
+	combo_badge.hide()
+	add_child(combo_badge)
+
+	# 2. Huge Multikill Announcement Banner
+	milestone_banner = Label.new()
+	milestone_banner.name = "MilestoneBanner"
+	milestone_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	milestone_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	milestone_banner.anchor_left = 0.0
+	milestone_banner.anchor_right = 1.0
+	milestone_banner.offset_top = 135.0
+	milestone_banner.offset_bottom = 185.0
+	milestone_banner.add_theme_font_size_override("font_size", 30)
+	milestone_banner.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.95))
+	milestone_banner.add_theme_constant_override("shadow_offset_x", 3)
+	milestone_banner.add_theme_constant_override("shadow_offset_y", 3)
+	milestone_banner.hide()
+	add_child(milestone_banner)
+
+func update_combo(count: int) -> void:
+	if not combo_badge:
+		_create_combo_elements()
+
+	if count < 5:
+		combo_badge.hide()
+		return
+
+	combo_badge.show()
+	combo_scale = 1.32
+
+	var col = Color(0.3, 0.9, 1.0, 1.0)
+	var prefix = "⚡"
+	if count >= 250:
+		col = Color(1.0, 0.2, 0.6, 1.0)
+		prefix = "👑"
+	elif count >= 100:
+		col = Color(1.0, 0.3, 0.2, 1.0)
+		prefix = "💀"
+	elif count >= 50:
+		col = Color(1.0, 0.8, 0.2, 1.0)
+		prefix = "💥"
+	elif count >= 25:
+		col = Color(0.2, 1.0, 0.5, 1.0)
+		prefix = "🔥"
+
+	combo_label.text = "%s x%d COMBO!" % [prefix, count]
+	combo_label.add_theme_color_override("font_color", col)
+
+func show_combo_milestone(text: String, col: Color) -> void:
+	if not milestone_banner:
+		_create_combo_elements()
+
+	milestone_banner.text = text
+	milestone_banner.add_theme_color_override("font_color", col)
+	milestone_banner.show()
+	milestone_timer = 2.4
+	if sound_mgr and sound_mgr.has_method("play_chest"):
+		sound_mgr.play_chest()
+
 func show_surge_warning(text: String) -> void:
 	if not surge_banner:
 		_create_surge_banner()
@@ -210,6 +297,18 @@ func show_surge_warning(text: String) -> void:
 	surge_banner_timer = 3.8
 
 func _process(delta: float) -> void:
+	if combo_scale > 1.0:
+		combo_scale = move_toward(combo_scale, 1.0, 3.5 * delta)
+		if combo_badge:
+			combo_badge.scale = Vector2(combo_scale, combo_scale)
+
+	if milestone_timer > 0.0:
+		milestone_timer -= delta
+		var pulse = (int(Time.get_ticks_msec() / 90) % 2) * 0.3 + 0.7
+		milestone_banner.modulate = Color(1.0, 1.0, 1.0, pulse)
+		if milestone_timer <= 0.0:
+			milestone_banner.hide()
+
 	# Update card scale springs (quantized 10-fps retro tick for crisp pixel feel)
 	for c in active_card_scales.keys():
 		if is_instance_valid(c):

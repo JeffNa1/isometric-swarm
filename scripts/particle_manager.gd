@@ -1,6 +1,6 @@
 extends Node2D
 
-const MAX_PARTICLES: int = 600
+const MAX_PARTICLES: int = 3500
 
 var p_pos: PackedVector2Array = PackedVector2Array()
 var p_vel: PackedVector2Array = PackedVector2Array()
@@ -9,6 +9,7 @@ var p_life: PackedFloat32Array = PackedFloat32Array()
 var p_max_life: PackedFloat32Array = PackedFloat32Array()
 var p_size: PackedFloat32Array = PackedFloat32Array()
 var p_growth: PackedFloat32Array = PackedFloat32Array() # growth rate in pixels/sec
+var p_type: PackedInt32Array = PackedInt32Array() # 0: Circle, 1: Shard/Line, 2: Shockwave Ring
 
 var active_count: int = 0
 
@@ -21,6 +22,7 @@ func _ready() -> void:
 	p_max_life.resize(MAX_PARTICLES)
 	p_size.resize(MAX_PARTICLES)
 	p_growth.resize(MAX_PARTICLES)
+	p_type.resize(MAX_PARTICLES)
 
 func spawn_blood_burst(center: Vector2, col: Color, count: int = 14) -> void:
 	for i in range(count):
@@ -136,6 +138,48 @@ func spawn_shockwave_debris(center: Vector2, radius: float, count: int = 18) -> 
 		p_growth[idx] = -3.0
 		active_count += 1
 
+func spawn_chitin_shards(center: Vector2, col: Color, count: int = 14) -> void:
+	for i in range(count):
+		if active_count >= MAX_PARTICLES: break
+		var idx = active_count
+		p_pos[idx] = center
+		var ang = randf() * TAU
+		var spd = randf_range(180.0, 520.0)
+		p_vel[idx] = Vector2(cos(ang) * spd, sin(ang) * spd * 0.65)
+		p_color[idx] = col
+		p_life[idx] = randf_range(0.25, 0.5)
+		p_max_life[idx] = p_life[idx]
+		p_size[idx] = randf_range(3.0, 6.0)
+		p_growth[idx] = -4.0
+		p_type[idx] = 1 # Shard
+		active_count += 1
+
+func spawn_shockwave_ring(center: Vector2, col: Color, max_radius: float = 42.0) -> void:
+	if active_count >= MAX_PARTICLES: return
+	var idx = active_count
+	p_pos[idx] = center
+	p_vel[idx] = Vector2.ZERO
+	p_color[idx] = col
+	p_life[idx] = 0.22
+	p_max_life[idx] = 0.22
+	p_size[idx] = 4.0
+	p_growth[idx] = max_radius / 0.22 # expand to max radius
+	p_type[idx] = 2 # Shockwave ring
+	active_count += 1
+
+func spawn_ground_splatter(center: Vector2, col: Color) -> void:
+	if active_count >= MAX_PARTICLES: return
+	var idx = active_count
+	p_pos[idx] = center + Vector2(randf_range(-12, 12), randf_range(-6, 6))
+	p_vel[idx] = Vector2.ZERO
+	p_color[idx] = Color(col.r * 0.6, col.g * 0.6, col.b * 0.6, 0.65)
+	p_life[idx] = randf_range(8.0, 14.0) # Long lingering splatter on floor
+	p_max_life[idx] = p_life[idx]
+	p_size[idx] = randf_range(8.0, 16.0)
+	p_growth[idx] = 0.0
+	p_type[idx] = 3 # Ground splatter
+	active_count += 1
+
 func _process(delta: float) -> void:
 	if active_count == 0:
 		return
@@ -153,10 +197,12 @@ func _process(delta: float) -> void:
 				p_max_life[i] = p_max_life[last]
 				p_size[i] = p_size[last]
 				p_growth[i] = p_growth[last]
+				p_type[i] = p_type[last]
 			active_count -= 1
 		else:
 			p_pos[i] += p_vel[i] * delta
-			p_vel[i] = p_vel[i].move_toward(Vector2.ZERO, 320.0 * delta) # friction
+			if p_type[i] != 3: # decals don't experience drag
+				p_vel[i] = p_vel[i].move_toward(Vector2.ZERO, 340.0 * delta) # friction
 			p_size[i] = max(0.5, p_size[i] + p_growth[i] * delta)
 			i += 1
 
@@ -167,5 +213,18 @@ func _draw() -> void:
 		var alpha = clamp(p_life[i] / p_max_life[i], 0.0, 1.0)
 		var c = p_color[i]
 		c.a *= alpha
-		# Draw isometric particle (slight vertical squash for ground alignment if low vel)
-		draw_circle(p_pos[i], p_size[i], c)
+
+		var ptype = p_type[i]
+		match ptype:
+			1: # Shard
+				var v_norm = p_vel[i].normalized()
+				var trail_len = min(14.0, p_vel[i].length() * 0.035)
+				draw_line(p_pos[i] - v_norm * trail_len, p_pos[i], c, p_size[i] * 0.75)
+			2: # Shockwave ring
+				draw_arc(p_pos[i], p_size[i], 0.0, TAU, 16, c, 2.5)
+			3: # Ground splatter
+				draw_set_transform(p_pos[i], 0.0, Vector2(1.0, 0.5))
+				draw_circle(Vector2.ZERO, p_size[i], c)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			_: # Default circle
+				draw_circle(p_pos[i], p_size[i], c)

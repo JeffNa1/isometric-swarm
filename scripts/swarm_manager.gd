@@ -109,33 +109,33 @@ func spawn_enemy(spawn_pos: Vector2, enemy_type: int) -> bool:
 	hit_timers[idx] = 0.0
 	types[idx] = enemy_type
 
-	# Exponential Time-based Scaling Curves
-	var hp_mult = 1.0 + pow(elapsed_time / 60.0, 1.45) * 0.65
-	var spd_mult = min(1.75, 1.0 + (elapsed_time / 360.0) * 0.5)
-	var dmg_mult = 1.0 + (elapsed_time / 200.0) * 0.6
+	# Smooth Time-based Scaling Curves (Optimized for huge popcorn swarms)
+	var hp_mult = 1.0 + pow(elapsed_time / 60.0, 1.25) * 0.35
+	var spd_mult = min(1.65, 1.0 + (elapsed_time / 360.0) * 0.45)
+	var dmg_mult = 1.0 + (elapsed_time / 200.0) * 0.45
 
 	match enemy_type:
-		1: # Scout (Fast, Agile, Purple Wasp)
-			var base_hp = 25.0 * hp_mult
+		1: # Scout (Fast, Agile, Fragile Purple Wasp)
+			var base_hp = 11.0 * hp_mult
 			max_healths[idx] = base_hp
 			healths[idx] = base_hp
-			speeds[idx] = 190.0 * spd_mult
-			radii[idx] = 12.0
-			damages[idx] = 8.0 * dmg_mult
-		2: # Brute (Huge, High HP, Volcanic Behemoth)
-			var base_hp = 240.0 * hp_mult
+			speeds[idx] = 185.0 * spd_mult
+			radii[idx] = 10.0
+			damages[idx] = 5.0 * dmg_mult
+		2: # Brute (Huge, High HP, Volcanic Behemoth Mini-Boss)
+			var base_hp = 160.0 * hp_mult
 			max_healths[idx] = base_hp
 			healths[idx] = base_hp
 			speeds[idx] = 75.0 * spd_mult
-			radii[idx] = 25.0
-			damages[idx] = 32.0 * dmg_mult
-		_: # 0: Crawler (Swarm backbone, Crimson Beetle)
-			var base_hp = 42.0 * hp_mult
+			radii[idx] = 24.0
+			damages[idx] = 22.0 * dmg_mult
+		_: # 0: Crawler (Swarm backbone, Popcorn Crimson Beetle)
+			var base_hp = 16.0 * hp_mult
 			max_healths[idx] = base_hp
 			healths[idx] = base_hp
-			speeds[idx] = 125.0 * spd_mult
-			radii[idx] = 15.0
-			damages[idx] = 12.0 * dmg_mult
+			speeds[idx] = 120.0 * spd_mult
+			radii[idx] = 12.0
+			damages[idx] = 7.0 * dmg_mult
 
 	active_count += 1
 	swarm_count_changed.emit(active_count)
@@ -371,10 +371,10 @@ func _apply_damage_to_index(idx: int, dmg: float, knock: Vector2, is_crit: bool 
 		return
 	healths[idx] -= dmg
 	hit_timers[idx] = 0.12
-	velocities[idx] += knock * (0.35 if types[idx] == 2 else 1.0)
+	velocities[idx] += knock * (0.45 if types[idx] == 2 else 1.45)
 
 	# Floating damage number
-	if floating_txt_mgr and randf() < 0.3:
+	if floating_txt_mgr and randf() < 0.35:
 		floating_txt_mgr.spawn_damage(positions[idx], dmg, is_crit)
 
 	if healths[idx] <= 0.0:
@@ -388,16 +388,28 @@ func _kill_enemy(idx: int) -> void:
 	enemy_killed.emit(xp, pos, is_boss)
 
 	# Audio splat
-	if sound_mgr and randf() < 0.4:
+	if sound_mgr and randf() < 0.5:
 		sound_mgr.play_splat()
 
-	# Blood splatter particles matching enemy type
+	# Blood, Chitin Shards & Shockwave Ring matching enemy type
 	if particle_mgr:
-		var blood_col = Color(1.6, 0.2, 0.2, 1.0)
-		if e_type == 1: blood_col = Color(1.4, 0.3, 1.8, 1.0)
-		elif e_type == 2: blood_col = Color(1.8, 0.8, 0.1, 1.0)
-		var p_count = 16 if is_boss else (4 if e_type == 1 else 3)
+		var blood_col = Color(1.8, 0.22, 0.22, 1.0)
+		var shard_col = Color(2.6, 0.45, 0.3, 1.0)
+		if e_type == 1:
+			blood_col = Color(1.5, 0.3, 2.0, 1.0)
+			shard_col = Color(2.2, 0.6, 2.6, 1.0)
+		elif e_type == 2:
+			blood_col = Color(2.2, 1.1, 0.1, 1.0)
+			shard_col = Color(3.0, 1.8, 0.4, 1.0)
+
+		var p_count = 26 if is_boss else (10 if e_type == 1 else 8)
 		particle_mgr.spawn_blood_burst(pos, blood_col, p_count)
+		particle_mgr.spawn_chitin_shards(pos, shard_col, 14 if is_boss else 6)
+		particle_mgr.spawn_shockwave_ring(pos, blood_col * 1.3, 50.0 if is_boss else 26.0)
+
+		# Ground splatter decal (lingers on floor)
+		if is_boss or randf() < 0.32:
+			particle_mgr.spawn_ground_splatter(pos, blood_col)
 
 	# Swap-and-pop O(1)
 	var last_idx = active_count - 1

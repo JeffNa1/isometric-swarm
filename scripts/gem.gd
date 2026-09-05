@@ -5,10 +5,11 @@ extends Area2D
 
 var target: Node2D = null
 var speed: float = 0.0
-var max_speed: float = 680.0
-var acceleration: float = 1200.0
+var max_speed: float = 1350.0
+var acceleration: float = 2400.0
 var bob_offset: float = 0.0
 var time_alive: float = 0.0
+var swirl_offset: Vector2 = Vector2.ZERO
 
 const SpriteFactory = preload("res://scripts/sprite_factory.gd")
 static var gem_tex: ImageTexture = null
@@ -32,18 +33,21 @@ func _process(delta: float) -> void:
 			var player = cur.get_node_or_null("Entities/Player")
 			if player and is_instance_valid(player):
 				var rad = player.get("pickup_radius")
-				if rad == null: rad = 85.0
+				if rad == null: rad = 140.0
 				if global_position.distance_to(player.global_position) < rad:
 					target = player
-					speed = 140.0
+					speed = 180.0
+					var perp = (player.global_position - global_position).orthogonal().normalized()
+					swirl_offset = perp * randf_range(-40.0, 40.0)
 
 	# Fly toward target with accelerating curve
 	if target and is_instance_valid(target):
 		speed = move_toward(speed, max_speed, acceleration * delta)
+		swirl_offset = swirl_offset.move_toward(Vector2.ZERO, 160.0 * delta)
 		var dir = (target.global_position - global_position).normalized()
-		global_position += dir * speed * delta
+		global_position += (dir * speed + swirl_offset) * delta
 
-		if global_position.distance_to(target.global_position) < 24.0:
+		if global_position.distance_to(target.global_position) < 28.0:
 			if target.has_method("add_xp"):
 				target.add_xp(xp_value)
 			var cur = get_tree().current_scene
@@ -54,6 +58,10 @@ func _process(delta: float) -> void:
 						snd.play_chest()
 					elif snd.has_method("play_gem_pickup"):
 						snd.play_gem_pickup()
+				var pm = cur.get_node_or_null("ParticleManager")
+				if pm:
+					var p_col = Color(3.5, 2.5, 0.5, 1.0) if is_super_gem else Color(0.3, 2.8, 3.8, 1.0)
+					pm.spawn_sparks(target.global_position + Vector2(0, -18), p_col, 4)
 			queue_free()
 
 	queue_redraw()

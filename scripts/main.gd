@@ -24,6 +24,12 @@ var titans_triggered: bool = false
 var apocalypse_triggered: bool = false
 var boss_spawned: bool = false
 
+# Combo Multikill System
+var combo_count: int = 0
+var combo_timer: float = 0.0
+const COMBO_TIMEOUT: float = 2.0
+var next_combo_milestone: int = 25
+
 func _ready() -> void:
 	_setup_inputs_if_needed()
 	_connect_signals()
@@ -100,11 +106,11 @@ func _connect_signals() -> void:
 	swarm_mgr.swarm_count_changed.connect(hud.set_swarm_count)
 
 func _spawn_initial_horde() -> void:
-	# Only 12 initial Crawlers to test basic kiting with Railgun Lv1
-	for i in range(3):
-		var angle = (TAU / 3.0) * float(i)
-		var offset = Vector2(cos(angle) * 450.0, sin(angle) * 250.0)
-		swarm_mgr.spawn_cluster(player.global_position + offset, 4, 0)
+	# Massive initial swarm: 8 clusters of 8 Crawlers = 64 Crawlers scurrying right away!
+	for i in range(8):
+		var angle = (TAU / 8.0) * float(i)
+		var offset = Vector2(cos(angle) * 500.0, sin(angle) * 300.0)
+		swarm_mgr.spawn_cluster(player.global_position + offset, 8, 0)
 
 func _process(delta: float) -> void:
 	if get_tree().paused:
@@ -112,55 +118,64 @@ func _process(delta: float) -> void:
 
 	elapsed_time += delta
 
+	# Combo decay
+	if combo_timer > 0.0:
+		combo_timer -= delta
+		if combo_timer <= 0.0:
+			combo_count = 0
+			next_combo_milestone = 25
+			if hud and hud.has_method("update_combo"):
+				hud.update_combo(0)
+
 	# Camera follows player smoothly
 	if is_instance_valid(player):
 		camera.global_position = camera.global_position.lerp(player.global_position, 8.0 * delta)
 
-	# --- SCRIPTED SPAWN DIRECTOR (Vampire Survivors Pacing Curve) ---
+	# --- SCRIPTED SPAWN DIRECTOR (High Density Swarm Survivor Pacing) ---
 	_process_spawn_director(delta)
 
 func _process_spawn_director(delta: float) -> void:
 	spawn_timer += delta
 
-	# Phase 1: 00:00 - 00:45 | The Trickle (Early scrappy kiting)
+	# Phase 1: 00:00 - 00:45 | Immediate Swarm Influx (Culling Fodder)
 	if elapsed_time < 45.0:
-		if spawn_timer >= 2.2:
+		if spawn_timer >= 0.95:
 			spawn_timer = 0.0
-			if swarm_mgr.active_count < 60:
-				_spawn_wave_cluster(randi_range(6, 12), 0)
+			if swarm_mgr.active_count < 380:
+				_spawn_wave_cluster(randi_range(28, 48), 0)
 
-	# Phase 2: 00:45 - 02:00 | Scout Flankers (Pincer mobility test)
+	# Phase 2: 00:45 - 02:00 | Scout Flankers & Dense Packs
 	elif elapsed_time < 120.0:
-		if spawn_timer >= 1.6:
+		if spawn_timer >= 0.75:
 			spawn_timer = 0.0
-			if swarm_mgr.active_count < 260:
+			if swarm_mgr.active_count < 1400:
 				var e_type = 1 if randf() < 0.35 else 0
-				_spawn_wave_cluster(randi_range(16, 28), e_type)
+				_spawn_wave_cluster(randi_range(50, 95), e_type)
 
-	# Phase 3: 02:00 - 03:30 | Crimson Swarm Surge (Surround & AoE test)
+	# Phase 3: 02:00 - 03:30 | Crimson Swarm Surge (Surround & AoE Slaughter)
 	elif elapsed_time < 210.0:
 		if not surge_triggered:
 			surge_triggered = true
 			_trigger_swarm_surge()
 
-		if spawn_timer >= 1.2:
+		if spawn_timer >= 0.62:
 			spawn_timer = 0.0
-			if swarm_mgr.active_count < 1100:
+			if swarm_mgr.active_count < 2800:
 				var e_type = 1 if randf() < 0.3 else 0
-				_spawn_wave_cluster(randi_range(35, 60), e_type)
+				_spawn_wave_cluster(randi_range(80, 150), e_type)
 
-	# Phase 4: 03:30 - 05:00 | Titan Behemoths (Mini-Bosses & Super Drops)
+	# Phase 4: 03:30 - 05:00 | Titan Behemoths & Giant Hordes
 	elif elapsed_time < 300.0:
 		if not titans_triggered:
 			titans_triggered = true
 			_trigger_titan_wave()
 
-		if spawn_timer >= 1.0:
+		if spawn_timer >= 0.52:
 			spawn_timer = 0.0
-			if swarm_mgr.active_count < 2200:
+			if swarm_mgr.active_count < 3800:
 				var roll = randf()
 				var e_type = 2 if roll < 0.12 else (1 if roll < 0.4 else 0)
-				_spawn_wave_cluster(randi_range(40, 75), e_type)
+				_spawn_wave_cluster(randi_range(120, 220), e_type)
 
 	# Phase 5: 05:00+ | Apocalyptic Swarm & Apex Leviathan Boss
 	else:
@@ -175,12 +190,12 @@ func _process_spawn_director(delta: float) -> void:
 			if sound_mgr and sound_mgr.has_method("play_alarm"):
 				sound_mgr.play_alarm()
 
-		if spawn_timer >= 0.85:
+		if spawn_timer >= 0.45:
 			spawn_timer = 0.0
-			if swarm_mgr.active_count < 4200:
+			if swarm_mgr.active_count < 4800:
 				var roll = randf()
-				var e_type = 2 if roll < 0.18 else (1 if roll < 0.45 else 0)
-				_spawn_wave_cluster(randi_range(60, 110), e_type)
+				var e_type = 2 if roll < 0.16 else (1 if roll < 0.45 else 0)
+				_spawn_wave_cluster(randi_range(160, 280), e_type)
 
 func _spawn_boss() -> void:
 	if not entities_container or not is_instance_valid(player):
@@ -202,14 +217,14 @@ func _trigger_swarm_surge() -> void:
 	if hud.has_method("show_surge_warning"):
 		hud.show_surge_warning("⚠️ CẢNH BÁO: ĐỢT SÓNG QUÁI VÂY HÃM! ⚠️")
 	if camera and camera.has_method("add_trauma"):
-		camera.add_trauma(0.35)
+		camera.add_trauma(0.4)
 
-	# Ring of 280 Crawlers closing in from all directions
-	var ring_count = 280
+	# Ring of 450 Crawlers closing in from all directions
+	var ring_count = 450
 	var player_pos = player.global_position if is_instance_valid(player) else Vector2.ZERO
 	for i in range(ring_count):
 		var angle = (TAU / float(ring_count)) * float(i)
-		var spawn_pos = player_pos + Vector2(cos(angle) * 900.0, sin(angle) * 500.0)
+		var spawn_pos = player_pos + Vector2(cos(angle) * 950.0, sin(angle) * 550.0)
 		spawn_pos.x = clamp(spawn_pos.x, -4700.0, 4700.0)
 		spawn_pos.y = clamp(spawn_pos.y, -4700.0, 4700.0)
 		swarm_mgr.spawn_enemy(spawn_pos, 0)
@@ -220,12 +235,13 @@ func _trigger_titan_wave() -> void:
 	if hud.has_method("show_surge_warning"):
 		hud.show_surge_warning("⚠️ CỰ THÚ VOLCANIC BEHEMOTH TIẾP CẬN! ⚠️")
 	if camera and camera.has_method("add_trauma"):
-		camera.add_trauma(0.4)
+		camera.add_trauma(0.45)
 
-	# Spawn 4 Volcanic Behemoths in cardinal directions
+	# Spawn 8 Volcanic Behemoths in a ring
 	var player_pos = player.global_position if is_instance_valid(player) else Vector2.ZERO
-	var dirs = [Vector2(750, 0), Vector2(-750, 0), Vector2(0, 450), Vector2(0, -450)]
-	for d in dirs:
+	for i in range(8):
+		var angle = (TAU / 8.0) * float(i)
+		var d = Vector2(cos(angle) * 750.0, sin(angle) * 450.0)
 		swarm_mgr.spawn_enemy(player_pos + d, 2)
 
 func _spawn_wave_cluster(count: int, enemy_type: int) -> void:
@@ -246,10 +262,27 @@ func _on_enemy_killed(xp_val: int, pos: Vector2, is_boss: bool) -> void:
 	total_kills += 1
 	hud.set_kills(total_kills)
 
+	# Combo Multikill System
+	combo_count += 1
+	combo_timer = COMBO_TIMEOUT
+	if hud and hud.has_method("update_combo"):
+		hud.update_combo(combo_count)
+
+	if combo_count >= next_combo_milestone:
+		_trigger_combo_announcement(combo_count)
+		if combo_count >= 500:
+			next_combo_milestone += 250
+		elif combo_count >= 100:
+			next_combo_milestone += 100
+		elif combo_count >= 50:
+			next_combo_milestone = 100
+		else:
+			next_combo_milestone = 50
+
 	# Spawn physical XP Gem (Drop chance 65% for fodder, 100% for bosses)
 	if randf() < 0.65 or is_boss:
 		var gems = get_tree().get_nodes_in_group("gems")
-		if gems.size() >= 250 and not is_boss:
+		if gems.size() >= 300 and not is_boss:
 			# Vampire Survivors gem consolidation: upgrade an existing gem instead of creating new node
 			var target_gem = gems[randi() % gems.size()]
 			if is_instance_valid(target_gem):
@@ -262,6 +295,28 @@ func _on_enemy_killed(xp_val: int, pos: Vector2, is_boss: bool) -> void:
 			gem.is_super_gem = is_boss
 			gem.global_position = pos
 			entities_container.call_deferred("add_child", gem)
+
+func _trigger_combo_announcement(streak: int) -> void:
+	var title = "🔥 %d COMBO!" % streak
+	var col = Color(1.0, 0.85, 0.2, 1.0)
+	if streak >= 500:
+		title = "👑 %d DIỆT VỰC THẲM THẦN THÁNH! 👑" % streak
+		col = Color(1.0, 0.2, 0.6, 1.0)
+	elif streak >= 250:
+		title = "💥 %d HỦY DIỆT KHÔNG THỂ CẢN! 💥" % streak
+		col = Color(1.0, 0.3, 0.2, 1.0)
+	elif streak >= 100:
+		title = "💀 %d CUỒNG NỘ ĐẪM MÁU! 💀" % streak
+		col = Color(0.9, 0.2, 1.0, 1.0)
+	elif streak >= 50:
+		title = "⚡ %d ĐẠI ĐỒ SÁT! ⚡" % streak
+		col = Color(0.2, 0.9, 1.0, 1.0)
+
+	if hud and hud.has_method("show_combo_milestone"):
+		hud.show_combo_milestone(title, col)
+
+	if camera and camera.has_method("add_trauma"):
+		camera.add_trauma(0.3)
 
 func _on_player_died() -> void:
 	hud.show_game_over(player.level)

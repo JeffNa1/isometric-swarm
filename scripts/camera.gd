@@ -8,6 +8,7 @@ extends Camera2D
 var trauma: float = 0.0
 var time: float = 0.0
 var trauma_added_this_frame: float = 0.0
+var punch_impulse: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	add_to_group("camera")
@@ -18,17 +19,24 @@ func add_trauma(amount: float) -> void:
 	var blended = max(trauma, trauma_added_this_frame) + (trauma_added_this_frame * 0.15)
 	trauma = clamp(blended, 0.0, max_trauma_cap)
 
+func add_directional_trauma(amount: float, dir: Vector2) -> void:
+	add_trauma(amount)
+	punch_impulse += dir.normalized() * (amount * 18.0)
+	punch_impulse = punch_impulse.limit_length(22.0)
+
 func _process(delta: float) -> void:
 	trauma_added_this_frame = 0.0
 	time += delta * 45.0
 
-	if trauma > 0.0:
+	punch_impulse = punch_impulse.move_toward(Vector2.ZERO, 90.0 * delta)
+
+	if trauma > 0.0 or punch_impulse != Vector2.ZERO:
 		trauma = max(0.0, trauma - trauma_decay * delta)
 		var shake = trauma * trauma # Non-linear quadratic shake feel
 		
-		# High frequency 2D noise shake
-		var shake_x = max_offset.x * shake * sin(time * 1.4)
-		var shake_y = max_offset.y * shake * cos(time * 1.7)
+		# High frequency 2D noise shake + directional kick
+		var shake_x = max_offset.x * shake * sin(time * 1.4) + punch_impulse.x
+		var shake_y = max_offset.y * shake * cos(time * 1.7) + punch_impulse.y
 		offset = Vector2(shake_x, shake_y)
 		rotation = max_roll * shake * sin(time * 2.1)
 	else:

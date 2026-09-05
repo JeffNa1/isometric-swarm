@@ -13,7 +13,7 @@ signal player_died()
 
 var current_health: float = 100.0
 var move_speed: float = 250.0
-var pickup_radius: float = 85.0
+var pickup_radius: float = 140.0
 
 var xp: int = 0
 var level: int = 1
@@ -132,6 +132,10 @@ func _physics_process(delta: float) -> void:
 		hurt_flash_timer -= delta
 		queue_redraw()
 
+	if invuln_timer > 0.0:
+		invuln_timer -= delta
+		queue_redraw()
+
 	if recoil_offset.length_squared() > 0.001:
 		recoil_offset = recoil_offset.move_toward(Vector2.ZERO, 70.0 * delta)
 
@@ -177,11 +181,12 @@ func trigger_hit_stop(duration: float = 0.035) -> void:
 	get_tree().paused = false
 
 func take_damage(amount: float) -> void:
-	if current_health <= 0.0:
+	if current_health <= 0.0 or invuln_timer > 0.0:
 		return
 
+	invuln_timer = 0.28
+	hurt_flash_timer = 0.18
 	current_health = max(0.0, current_health - amount)
-	hurt_flash_timer = 0.12
 	health_changed.emit(current_health, max_health)
 
 	if not sound_mgr:
@@ -191,7 +196,7 @@ func take_damage(amount: float) -> void:
 		sound_mgr.play_hit()
 
 	if camera_node and camera_node.has_method("add_trauma"):
-		camera_node.add_trauma(0.24)
+		camera_node.add_trauma(0.26)
 
 	queue_redraw()
 
@@ -341,7 +346,10 @@ func _draw() -> void:
 
 	var tex = player_frames[clampi(active_frame, 0, player_frames.size() - 1)]
 	var flip = 1.0 if facing_right else -1.0
-	var col = Color(5.0, 5.0, 5.0, 1.0) if hurt_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, 1.0)
+	var col = Color(5.0, 1.5, 1.5, 1.0) if hurt_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, 1.0)
+	if invuln_timer > 0.0:
+		var flick = (int(Time.get_ticks_msec() / 45) % 2) == 0
+		col.a = 0.35 if flick else 0.95
 
 	draw_set_transform(recoil_offset, 0.0, Vector2(flip, 1.0))
 	draw_texture(tex, Vector2(-24.0, -41.0), col)
