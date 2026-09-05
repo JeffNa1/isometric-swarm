@@ -14,9 +14,13 @@ var spatial_grid = SpatialGridClass.new(SPATIAL_CELL_SIZE)
 
 var active_count: int = 0
 
+const COL_WHITE: Color = Color(1.0, 1.0, 1.0, 1.0)
+const COL_HIT: Color = Color(5.0, 5.0, 5.0, 1.0)
+
 # Swarm data arrays
 var positions: PackedVector2Array = PackedVector2Array()
 var velocities: PackedVector2Array = PackedVector2Array()
+var separation_forces: PackedVector2Array = PackedVector2Array()
 var healths: PackedFloat32Array = PackedFloat32Array()
 var max_healths: PackedFloat32Array = PackedFloat32Array()
 var types: PackedInt32Array = PackedInt32Array() # 0: Crawler, 1: Scout, 2: Brute
@@ -31,6 +35,10 @@ var particle_mgr: Node2D = null
 var floating_txt_mgr: Node2D = null
 var player_radius: float = 14.0
 var elapsed_time: float = 0.0
+
+var cached_bosses: Array[Node] = []
+var cached_crates: Array[Node] = []
+var target_refresh_timer: float = 0.0
 
 signal enemy_killed(xp_val: int, pos: Vector2, is_boss: bool)
 signal swarm_count_changed(count: int)
@@ -53,6 +61,7 @@ func _get_managers() -> void:
 func _allocate_arrays() -> void:
 	positions.resize(MAX_SWARM)
 	velocities.resize(MAX_SWARM)
+	separation_forces.resize(MAX_SWARM)
 	healths.resize(MAX_SWARM)
 	max_healths.resize(MAX_SWARM)
 	types.resize(MAX_SWARM)
@@ -108,6 +117,7 @@ func spawn_enemy(spawn_pos: Vector2, enemy_type: int) -> bool:
 	var idx = active_count
 	positions[idx] = spawn_pos
 	velocities[idx] = Vector2.ZERO
+	separation_forces[idx] = Vector2.ZERO
 	hit_timers[idx] = 0.0
 	types[idx] = enemy_type
 
@@ -162,6 +172,12 @@ func _physics_process(delta: float) -> void:
 	if not player_ref:
 		_get_managers()
 
+	target_refresh_timer -= delta
+	if target_refresh_timer <= 0.0:
+		target_refresh_timer = 0.5
+		cached_bosses = get_tree().get_nodes_in_group("boss")
+		cached_crates = get_tree().get_nodes_in_group("crates")
+
 	spatial_grid.clear()
 	for i in range(active_count):
 		spatial_grid.insert(i, positions[i])
@@ -175,28 +191,35 @@ func _physics_process(delta: float) -> void:
 	var s_idx = 0
 	var b_idx = 0
 	var ticks = Time.get_ticks_msec() * 0.001
+	var frame_idx = Engine.get_physics_frames()
 
 	for i in range(active_count):
 		var pos = positions[i]
 		var to_player = player_pos - pos
 		var dist_to_player = to_player.length()
 
-		var norm_to_player = to_player.normalized()
+		var norm_to_player = to_player / max(0.001, dist_to_player)
 		var iso_dir = Vector2(norm_to_player.x, norm_to_player.y * 0.75).normalized()
 
-		var sep_force = Vector2.ZERO
 		var rad_i = radii[i]
+		var sep_force = separation_forces[i]
 		if dist_to_player < 950.0:
-			var neighbors = spatial_grid.get_neighbors_capped(pos, 6)
-
-			for n_idx in neighbors:
-				if n_idx != i and n_idx < active_count:
-					var diff = pos - positions[n_idx]
-					var d_sq = diff.length_squared()
-					var min_d = rad_i + radii[n_idx]
-					if d_sq < min_d * min_d and d_sq > 0.01:
-						var d = sqrt(d_sq)
-						sep_force += (diff / d) * (min_d - d) * 14.0
+			if (i + frame_idx) % 2 == 0:
+				var neighbors = spatial_grid.get_neighbors_capped(pos, 5)
+				var new_sep = Vector2.ZERO
+				for n_idx in neighbors:
+					if n_idx != i and n_idx < active_count:
+						var diff = pos - positions[n_idx]
+						var d_sq = diff.length_squared()
+						var min_d = rad_i + radii[n_idx]
+						if d_sq < min_d * min_d and d_sq > 0.01:
+							var d = sqrt(d_sq)
+							new_sep += (diff / d) * (min_d - d) * 14.0
+				separation_forces[i] = new_sep
+				sep_force = new_sep
+		else:
+			separation_forces[i] = Vector2.ZERO
+			sep_force = Vector2.ZERO
 
 		var target_vel = (iso_dir * speeds[i]) + sep_force
 		velocities[i] = velocities[i].move_toward(target_vel, 750.0 * delta)
@@ -210,28 +233,37 @@ func _physics_process(delta: float) -> void:
 			hit_timers[i] -= delta
 
 		var is_hit = hit_timers[i] > 0.0
-		var col = Color(5.0, 5.0, 5.0, 1.0) if is_hit else Color(1.0, 1.0, 1.0, 1.0)
+		var col = COL_HIT if is_hit else COL_WHITE
 		var t_type = types[i]
 
+		# LOD: Skip sinusoidal wobble calculations when mob is off-camera
+		var is_on_screen = dist_to_player <= 1100.0
+		var rot: float = 0.0
+		if is_on_screen:
+			match t_type:
+				1: # Scout
+					var hover_wiggle = sin(ticks * 24.0 + float(i) * 2.0) * 0.12
+					rot = velocities[i].angle() + PI * 0.5 + hover_wiggle
+				2: # Brute
+					var heavy_tread = sin(ticks * 8.0 + float(i)) * 0.07
+					rot = velocities[i].angle() + PI * 0.5 + heavy_tread
+				_: # Crawler
+					var scuttle = sin(ticks * 16.0 + float(i) * 1.5) * 0.18
+					rot = velocities[i].angle() + PI * 0.5 + scuttle
+		else:
+			rot = velocities[i].angle() + PI * 0.5
+
+		var t = Transform2D(rot, Vector2.ONE, 0.0, positions[i])
 		match t_type:
-			1: # Scout
-				var hover_wiggle = sin(ticks * 24.0 + float(i) * 2.0) * 0.12
-				var rot = velocities[i].angle() + PI * 0.5 + hover_wiggle
-				var t = Transform2D(rot, Vector2.ONE, 0.0, positions[i])
+			1:
 				mm_scout.set_instance_transform_2d(s_idx, t)
 				mm_scout.set_instance_color(s_idx, col)
 				s_idx += 1
-			2: # Brute
-				var heavy_tread = sin(ticks * 8.0 + float(i)) * 0.07
-				var rot = velocities[i].angle() + PI * 0.5 + heavy_tread
-				var t = Transform2D(rot, Vector2.ONE, 0.0, positions[i])
+			2:
 				mm_brute.set_instance_transform_2d(b_idx, t)
 				mm_brute.set_instance_color(b_idx, col)
 				b_idx += 1
-			_: # Crawler
-				var scuttle = sin(ticks * 16.0 + float(i) * 1.5) * 0.18
-				var rot = velocities[i].angle() + PI * 0.5 + scuttle
-				var t = Transform2D(rot, Vector2.ONE, 0.0, positions[i])
+			_:
 				mm_crawler.set_instance_transform_2d(c_idx, t)
 				mm_crawler.set_instance_color(c_idx, col)
 				c_idx += 1
@@ -245,22 +277,20 @@ func damage_in_radius(center: Vector2, radius: float, damage: float, knockback: 
 	var targets = spatial_grid.get_nearby(center, radius)
 	var radius_sq = radius * radius
 
-	var processed_indices: Dictionary = {}
 	for idx in targets:
-		if idx < active_count and not processed_indices.has(idx):
-			processed_indices[idx] = true
+		if idx < active_count:
 			var diff = positions[idx] - center
 			if diff.length_squared() <= radius_sq:
 				var knock_dir = diff.normalized()
 				_apply_damage_to_index(idx, damage, knock_dir * knockback, true)
 				hit_count += 1
 
-	for b in get_tree().get_nodes_in_group("boss"):
+	for b in cached_bosses:
 		if is_instance_valid(b) and b.has_method("take_damage"):
 			if b.global_position.distance_to(center) <= (radius + 34.0):
 				b.take_damage(damage)
 
-	for c in get_tree().get_nodes_in_group("crates"):
+	for c in cached_crates:
 		if is_instance_valid(c) and c.has_method("take_damage"):
 			if c.global_position.distance_to(center) <= (radius + 20.0):
 				c.take_damage(damage)
@@ -277,13 +307,11 @@ func damage_along_beam(start: Vector2, end: Vector2, width: float, damage: float
 	var max_p = Vector2(max(start.x, end.x) + width, max(start.y, end.y) + width)
 	var center = (min_p + max_p) * 0.5
 	var diag_rad = min_p.distance_to(max_p) * 0.5
-	
+
 	var candidates = spatial_grid.get_nearby(center, diag_rad)
-	var processed: Dictionary = {}
 
 	for idx in candidates:
-		if idx < active_count and not processed.has(idx):
-			processed[idx] = true
+		if idx < active_count:
 			var pos = positions[idx]
 			var to_pos = pos - start
 			var proj_dist = to_pos.dot(beam_dir)
@@ -293,7 +321,7 @@ func damage_along_beam(start: Vector2, end: Vector2, width: float, damage: float
 					_apply_damage_to_index(idx, damage, beam_dir * knockback, randf() < 0.25)
 					hit_count += 1
 
-	for b in get_tree().get_nodes_in_group("boss"):
+	for b in cached_bosses:
 		if is_instance_valid(b) and b.has_method("take_damage"):
 			var to_b = b.global_position - start
 			var proj = to_b.dot(beam_dir)
@@ -301,7 +329,7 @@ func damage_along_beam(start: Vector2, end: Vector2, width: float, damage: float
 				if abs(to_b.cross(beam_dir)) <= (half_width + 34.0):
 					b.take_damage(damage)
 
-	for c in get_tree().get_nodes_in_group("crates"):
+	for c in cached_crates:
 		if is_instance_valid(c) and c.has_method("take_damage"):
 			var to_c = c.global_position - start
 			var proj = to_c.dot(beam_dir)
@@ -317,11 +345,9 @@ func damage_in_cone(origin: Vector2, direction: Vector2, max_dist: float, angle_
 	var min_dot = cos(deg_to_rad(angle_deg * 0.5))
 	var candidates = spatial_grid.get_nearby(origin, max_dist)
 	var max_dist_sq = max_dist * max_dist
-	var processed: Dictionary = {}
 
 	for idx in candidates:
-		if idx < active_count and not processed.has(idx):
-			processed[idx] = true
+		if idx < active_count:
 			var diff = positions[idx] - origin
 			var d_sq = diff.length_squared()
 			if d_sq <= max_dist_sq and d_sq > 0.01:
@@ -330,14 +356,14 @@ func damage_in_cone(origin: Vector2, direction: Vector2, max_dist: float, angle_
 					_apply_damage_to_index(idx, damage, to_norm * 90.0, false)
 					hit_count += 1
 
-	for b in get_tree().get_nodes_in_group("boss"):
+	for b in cached_bosses:
 		if is_instance_valid(b) and b.has_method("take_damage"):
 			var diff = b.global_position - origin
 			if diff.length_squared() <= max_dist_sq:
 				if diff.normalized().dot(norm_dir) >= min_dot:
 					b.take_damage(damage)
 
-	for c in get_tree().get_nodes_in_group("crates"):
+	for c in cached_crates:
 		if is_instance_valid(c) and c.has_method("take_damage"):
 			var diff = c.global_position - origin
 			if diff.length_squared() <= max_dist_sq:
@@ -356,12 +382,12 @@ func nuke_screen(center: Vector2, radius: float = 1600.0) -> int:
 				_kill_enemy(i)
 				count += 1
 
-	for b in get_tree().get_nodes_in_group("boss"):
+	for b in cached_bosses:
 		if is_instance_valid(b) and b.has_method("take_damage"):
 			if b.global_position.distance_to(center) <= radius:
 				b.take_damage(1200.0)
 
-	for c in get_tree().get_nodes_in_group("crates"):
+	for c in cached_crates:
 		if is_instance_valid(c) and c.has_method("take_damage"):
 			if c.global_position.distance_to(center) <= radius:
 				c.take_damage(100.0)
@@ -418,6 +444,7 @@ func _kill_enemy(idx: int) -> void:
 	if idx != last_idx:
 		positions[idx] = positions[last_idx]
 		velocities[idx] = velocities[last_idx]
+		separation_forces[idx] = separation_forces[last_idx]
 		healths[idx] = healths[last_idx]
 		max_healths[idx] = max_healths[last_idx]
 		types[idx] = types[last_idx]

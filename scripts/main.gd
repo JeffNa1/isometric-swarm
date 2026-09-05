@@ -30,6 +30,9 @@ var combo_timer: float = 0.0
 const COMBO_TIMEOUT: float = 2.0
 var next_combo_milestone: int = 25
 
+# Internal tracked list of gems (O(1) lookups, zero tree traversal)
+var active_gems: Array[Node2D] = []
+
 func _ready() -> void:
 	_setup_inputs_if_needed()
 	_connect_signals()
@@ -75,8 +78,7 @@ func _spawn_crates() -> void:
 func vacuum_all_gems() -> void:
 	if not is_instance_valid(player):
 		return
-	var gems = get_tree().get_nodes_in_group("gems")
-	for g in gems:
+	for g in active_gems:
 		if is_instance_valid(g) and g.has_method("attract_to"):
 			g.attract_to(player)
 
@@ -281,10 +283,9 @@ func _on_enemy_killed(xp_val: int, pos: Vector2, is_boss: bool) -> void:
 
 	# Spawn physical XP Gem (Drop chance 30% for fodder, 100% for bosses)
 	if randf() < 0.30 or is_boss:
-		var gems = get_tree().get_nodes_in_group("gems")
-		if gems.size() >= 300 and not is_boss:
+		if active_gems.size() >= 300 and not is_boss:
 			# Vampire Survivors gem consolidation: upgrade an existing gem instead of creating new node
-			var target_gem = gems[randi() % gems.size()]
+			var target_gem = active_gems[randi() % active_gems.size()]
 			if is_instance_valid(target_gem):
 				target_gem.xp_value += xp_val
 				target_gem.is_super_gem = true
@@ -294,6 +295,8 @@ func _on_enemy_killed(xp_val: int, pos: Vector2, is_boss: bool) -> void:
 			gem.xp_value = xp_val
 			gem.is_super_gem = is_boss
 			gem.global_position = pos
+			active_gems.append(gem)
+			gem.tree_exited.connect(func(): active_gems.erase(gem))
 			entities_container.call_deferred("add_child", gem)
 
 func _trigger_combo_announcement(streak: int) -> void:

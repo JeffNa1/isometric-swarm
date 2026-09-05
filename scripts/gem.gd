@@ -14,34 +14,61 @@ var swirl_offset: Vector2 = Vector2.ZERO
 const SpriteFactory = preload("res://scripts/sprite_factory.gd")
 static var gem_tex: ImageTexture = null
 
+static var player_ref: Node2D = null
+static var sound_mgr: Node = null
+static var particle_mgr: Node2D = null
+
 func _ready() -> void:
 	if not gem_tex:
 		gem_tex = SpriteFactory.create_gem_texture()
 	collision_layer = 8
 	collision_mask = 0
 	add_to_group("gems")
+	_ensure_managers()
 	queue_redraw()
 
-func _process(delta: float) -> void:
-	time_alive += delta
-	bob_offset = sin(time_alive * 6.0) * 3.5
+static func _ensure_managers() -> void:
+	if not is_instance_valid(player_ref) or not is_instance_valid(sound_mgr) or not is_instance_valid(particle_mgr):
+		var tree = Engine.get_main_loop() as SceneTree
+		if tree and tree.current_scene:
+			var cur = tree.current_scene
+			player_ref = cur.get_node_or_null("Entities/Player")
+			sound_mgr = cur.get_node_or_null("SoundManager")
+			particle_mgr = cur.get_node_or_null("ParticleManager")
 
-	# Magnetic check if untargeted
+func _process(delta: float) -> void:
+	# If untargeted, check distance to player
 	if not target:
-		var cur = get_tree().current_scene
-		if cur:
-			var player = cur.get_node_or_null("Entities/Player")
-			if player and is_instance_valid(player):
-				var rad = player.get("pickup_radius")
-				if rad == null: rad = 140.0
-				if global_position.distance_to(player.global_position) < rad:
-					target = player
-					speed = 180.0
-					var perp = (player.global_position - global_position).orthogonal().normalized()
-					swirl_offset = perp * randf_range(-40.0, 40.0)
+		if not is_instance_valid(player_ref):
+			_ensure_managers()
+			if not is_instance_valid(player_ref):
+				return
+
+		var dist_sq = global_position.distance_squared_to(player_ref.global_position)
+		var rad = player_ref.get("pickup_radius")
+		if rad == null: rad = 140.0
+		var rad_sq = rad * rad
+
+		# Off-screen culling for gems: If gem is > 950px away, skip bobbing redraw!
+		if dist_sq > 902500.0:
+			return
+
+		time_alive += delta
+		bob_offset = sin(time_alive * 6.0) * 3.5
+
+		if dist_sq < rad_sq:
+			target = player_ref
+			speed = 180.0
+			var perp = (player_ref.global_position - global_position).orthogonal().normalized()
+			swirl_offset = perp * randf_range(-40.0, 40.0)
+
+		queue_redraw()
+		return
 
 	# Fly toward target with accelerating curve
-	if target and is_instance_valid(target):
+	if is_instance_valid(target):
+		time_alive += delta
+		bob_offset = sin(time_alive * 6.0) * 3.5
 		speed = move_toward(speed, max_speed, acceleration * delta)
 		swirl_offset = swirl_offset.move_toward(Vector2.ZERO, 160.0 * delta)
 		var dir = (target.global_position - global_position).normalized()
@@ -50,21 +77,18 @@ func _process(delta: float) -> void:
 		if global_position.distance_to(target.global_position) < 28.0:
 			if target.has_method("add_xp"):
 				target.add_xp(xp_value)
-			var cur = get_tree().current_scene
-			if cur:
-				var snd = cur.get_node_or_null("SoundManager")
-				if snd:
-					if is_super_gem and snd.has_method("play_chest"):
-						snd.play_chest()
-					elif snd.has_method("play_gem_pickup"):
-						snd.play_gem_pickup()
-				var pm = cur.get_node_or_null("ParticleManager")
-				if pm:
-					var p_col = Color(3.5, 2.5, 0.5, 1.0) if is_super_gem else Color(0.4, 3.2, 1.2, 1.0)
-					pm.spawn_sparks(target.global_position + Vector2(0, -18), p_col, 4)
+			if sound_mgr:
+				if is_super_gem and sound_mgr.has_method("play_chest"):
+					sound_mgr.play_chest()
+				elif sound_mgr.has_method("play_gem_pickup"):
+					sound_mgr.play_gem_pickup()
+			if particle_mgr:
+				var p_col = Color(3.5, 2.5, 0.5, 1.0) if is_super_gem else Color(0.4, 3.2, 1.2, 1.0)
+				particle_mgr.spawn_sparks(target.global_position + Vector2(0, -18), p_col, 4)
 			queue_free()
+			return
 
-	queue_redraw()
+		queue_redraw()
 
 func attract_to(new_target: Node2D) -> void:
 	if not target:

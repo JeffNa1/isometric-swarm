@@ -231,22 +231,16 @@ func _process(delta: float) -> void:
 func _on_ground_draw() -> void:
 	if not is_instance_valid(ground_canvas):
 		return
+	ground_canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.5))
 	for i in range(active_count):
 		var ptype = p_type[i]
 		if ptype == 0 or ptype == 3:
 			var alpha = clamp(p_life[i] / p_max_life[i], 0.0, 1.0)
 			var c = p_color[i]
 			c.a *= alpha
-			if ptype == 3:
-				# Isometric flattened splatter decal strictly on ground
-				ground_canvas.draw_set_transform(p_pos[i], 0.0, Vector2(1.0, 0.5))
-				ground_canvas.draw_circle(Vector2.ZERO, p_size[i], c)
-				ground_canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-			else:
-				# Blood drop on floor
-				ground_canvas.draw_set_transform(p_pos[i], 0.0, Vector2(1.0, 0.6))
-				ground_canvas.draw_circle(Vector2.ZERO, p_size[i], c)
-				ground_canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			# Batch drawn in isometric scale space (1.0, 0.5)
+			ground_canvas.draw_circle(Vector2(p_pos[i].x, p_pos[i].y * 2.0), p_size[i], c)
+	ground_canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw() -> void:
 	for i in range(active_count):
@@ -258,9 +252,13 @@ func _draw() -> void:
 
 			match ptype:
 				1: # Shard
-					var v_norm = p_vel[i].normalized()
-					var trail_len = min(14.0, p_vel[i].length() * 0.035)
-					draw_line(p_pos[i] - v_norm * trail_len, p_pos[i], c, p_size[i] * 0.75)
+					var spd = p_vel[i].length()
+					if spd > 0.1:
+						var v_norm = p_vel[i] / spd
+						var trail_len = min(14.0, spd * 0.035)
+						draw_line(p_pos[i] - v_norm * trail_len, p_pos[i], c, p_size[i] * 0.75)
+					else:
+						draw_circle(p_pos[i], p_size[i] * 0.5, c)
 				2: # Shockwave ring
 					draw_arc(p_pos[i], p_size[i], 0.0, TAU, 16, c, 2.5)
 				_: # Default air circle (sparks, flame, smoke, debris)
