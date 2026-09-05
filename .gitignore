@@ -1,0 +1,7 @@
+# Godot 4 standard .gitignore
+.godot/
+*.translation
+*.log
+*.tmp
+debug_engine.log
+godot_run.log
