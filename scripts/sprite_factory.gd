@@ -512,7 +512,7 @@ static func create_crate_texture() -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
-static func create_pickup_texture(pickup_type: int) -> ImageTexture:
+static func create_pickup_texture(pickup_type = 0) -> ImageTexture:
 	var w = 24
 	var h = 24
 	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
@@ -526,7 +526,18 @@ static func create_pickup_texture(pickup_type: int) -> ImageTexture:
 			if dx * dx + dy * dy <= 1.0:
 				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.35))
 
-	match pickup_type:
+	var type_int: int = 0
+	if typeof(pickup_type) == TYPE_STRING:
+		match pickup_type:
+			"nuke": type_int = 0
+			"vacuum": type_int = 1
+			"medkit": type_int = 2
+			"overclock": type_int = 3
+			_: type_int = 4
+	else:
+		type_int = int(pickup_type)
+
+	match type_int:
 		0: # 0: EMP Nuke (Hazard warhead with lightning)
 			for y in range(4, 18):
 				for x in range(5, 19):
