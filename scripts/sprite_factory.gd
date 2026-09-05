@@ -1267,3 +1267,195 @@ static func create_item_icon(item_id: String) -> ImageTexture:
 	_item_icon_cache[item_id] = tex
 	return tex
 
+
+static var _pixel_panel_cache: Dictionary = {}
+static var _pixel_bar_cache: Dictionary = {}
+
+static func create_pixel_panel_texture(border_col: Color, bg_col: Color, accent_col: Color = Color.TRANSPARENT, corner_bolts: bool = true) -> ImageTexture:
+	var key = "%s_%s_%s_%s" % [border_col.to_html(), bg_col.to_html(), accent_col.to_html(), str(corner_bolts)]
+	if _pixel_panel_cache.has(key):
+		return _pixel_panel_cache[key]
+
+	var size = 24
+	var img = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# 1. Fill interior with subtle dithered graphite
+	for y in range(2, size - 2):
+		for x in range(2, size - 2):
+			var dither = ((x + y) % 2 == 0)
+			var col = bg_col.lightened(0.04) if dither else bg_col
+			img.set_pixel(x, y, col)
+
+	# 2. Outer dark pixel outline with 45-degree chamfered corners (vát góc)
+	var outline_col = Color(0.01, 0.02, 0.04, 0.98)
+	for i in range(2, size - 2):
+		img.set_pixel(i, 0, outline_col)
+		img.set_pixel(i, size - 1, outline_col)
+		img.set_pixel(0, i, outline_col)
+		img.set_pixel(size - 1, i, outline_col)
+
+	# Cut corner diagonals
+	img.set_pixel(1, 1, outline_col)
+	img.set_pixel(size - 2, 1, outline_col)
+	img.set_pixel(1, size - 2, outline_col)
+	img.set_pixel(size - 2, size - 2, outline_col)
+
+	# 3. Main neon / metal border (inner 1px)
+	var highlight_col = border_col.lightened(0.25)
+	var shadow_col = border_col.darkened(0.35)
+
+	for i in range(2, size - 2):
+		img.set_pixel(i, 1, highlight_col) # Top highlight
+		img.set_pixel(1, i, highlight_col) # Left highlight
+		img.set_pixel(i, size - 2, shadow_col) # Bottom shadow
+		img.set_pixel(size - 2, i, shadow_col) # Right shadow
+
+	# 4. Inset border line (2px from edge)
+	for i in range(3, size - 3):
+		img.set_pixel(i, 2, border_col)
+		img.set_pixel(2, i, border_col)
+		img.set_pixel(i, size - 3, border_col * 0.8)
+		img.set_pixel(size - 3, i, border_col * 0.8)
+
+	# 5. Corner bolts (rivet pixel studs)
+	if corner_bolts:
+		var bolt_col = accent_col if accent_col.a > 0.0 else Color(0.9, 0.95, 1.0, 1.0)
+		var bolt_corners = [
+			Vector2i(3, 3), Vector2i(size - 5, 3),
+			Vector2i(3, size - 5), Vector2i(size - 5, size - 5)
+		]
+		for c in bolt_corners:
+			img.set_pixel(c.x, c.y, Color(1.0, 1.0, 1.0, 1.0))
+			img.set_pixel(c.x + 1, c.y, bolt_col)
+			img.set_pixel(c.x, c.y + 1, bolt_col.darkened(0.3))
+			img.set_pixel(c.x + 1, c.y + 1, Color(0.05, 0.08, 0.12, 1.0))
+
+	var tex = ImageTexture.create_from_image(img)
+	_pixel_panel_cache[key] = tex
+	return tex
+
+static func create_pixel_button_texture(border_col: Color, bg_col: Color, is_pressed: bool = false, is_hover: bool = false) -> ImageTexture:
+	var key = "btn_%s_%s_%s_%s" % [border_col.to_html(), bg_col.to_html(), str(is_pressed), str(is_hover)]
+	if _pixel_panel_cache.has(key):
+		return _pixel_panel_cache[key]
+
+	var size = 16
+	var img = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var cur_bg = bg_col.lightened(0.12) if is_hover else bg_col
+	img.fill(cur_bg)
+
+	var outer_dark = Color(0.01, 0.02, 0.04, 0.98)
+	var hi = Color(1.0, 1.0, 1.0, 0.95) if is_hover else border_col.lightened(0.35)
+	var sh = outer_dark if is_pressed else border_col.darkened(0.4)
+
+	# 1px Outer border
+	for i in range(size):
+		img.set_pixel(i, 0, outer_dark)
+		img.set_pixel(i, size - 1, outer_dark)
+		img.set_pixel(0, i, outer_dark)
+		img.set_pixel(size - 1, i, outer_dark)
+
+	# 3D Raised Bevel or Pressed Inset
+	var top_left_col = sh if is_pressed else hi
+	var bot_right_col = hi if is_pressed else sh
+
+	for i in range(1, size - 1):
+		img.set_pixel(i, 1, top_left_col)
+		img.set_pixel(1, i, top_left_col)
+		img.set_pixel(i, size - 2, bot_right_col)
+		img.set_pixel(size - 2, i, bot_right_col)
+
+	var tex = ImageTexture.create_from_image(img)
+	_pixel_panel_cache[key] = tex
+	return tex
+
+static func create_pixel_bar_fill_texture(fill_col: Color, groove_col: Color = Color(0.02, 0.04, 0.08, 1.0)) -> ImageTexture:
+	var key = "bar_fill_%s_%s" % [fill_col.to_html(), groove_col.to_html()]
+	if _pixel_bar_cache.has(key):
+		return _pixel_bar_cache[key]
+
+	# Repeating 8-pixel segment (6px colored bar + 2px groove)
+	var w = 8
+	var h = 16
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	for y in range(h):
+		for x in range(w):
+			if x < 6:
+				# Active pixel LED block
+				if y == 0 or y == 1:
+					# Top highlight
+					img.set_pixel(x, y, fill_col.lightened(0.4))
+				elif y == h - 1 or y == h - 2:
+					# Bottom shadow
+					img.set_pixel(x, y, fill_col.darkened(0.4))
+				elif x == 0:
+					# Left bevel
+					img.set_pixel(x, y, fill_col.lightened(0.2))
+				elif x == 5:
+					# Right bevel
+					img.set_pixel(x, y, fill_col.darkened(0.2))
+				else:
+					# Center glowing body
+					img.set_pixel(x, y, fill_col)
+			else:
+				# 2px dark groove between notches
+				if x == 6:
+					img.set_pixel(x, y, groove_col.darkened(0.3))
+				else:
+					img.set_pixel(x, y, groove_col.lightened(0.1))
+
+	var tex = ImageTexture.create_from_image(img)
+	_pixel_bar_cache[key] = tex
+	return tex
+
+static func create_pixel_bar_bg_texture(bg_col: Color = Color(0.02, 0.04, 0.08, 0.95), border_col: Color = Color(0.12, 0.22, 0.35, 0.8)) -> ImageTexture:
+	var key = "bar_bg_%s_%s" % [bg_col.to_html(), border_col.to_html()]
+	if _pixel_bar_cache.has(key):
+		return _pixel_bar_cache[key]
+
+	var size = 16
+	var img = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	img.fill(bg_col)
+
+	# Indented groove border: dark on top/left, subtle highlight on bottom/right
+	var outer_dark = Color(0.01, 0.01, 0.02, 0.95)
+	var inner_shadow = Color(0.0, 0.0, 0.0, 0.8)
+	var inner_hi = border_col * 0.4
+
+	for i in range(size):
+		img.set_pixel(i, 0, outer_dark)
+		img.set_pixel(i, size - 1, outer_dark)
+		img.set_pixel(0, i, outer_dark)
+		img.set_pixel(size - 1, i, outer_dark)
+
+	for i in range(1, size - 1):
+		img.set_pixel(i, 1, inner_shadow)
+		img.set_pixel(1, i, inner_shadow)
+		img.set_pixel(i, size - 2, inner_hi)
+		img.set_pixel(size - 2, i, inner_hi)
+
+	var tex = ImageTexture.create_from_image(img)
+	_pixel_bar_cache[key] = tex
+	return tex
+
+static func create_pixel_stylebox(tex: Texture2D, margin: int = 6) -> StyleBoxTexture:
+	var sb = StyleBoxTexture.new()
+	sb.texture = tex
+	sb.texture_margin_left = margin
+	sb.texture_margin_top = margin
+	sb.texture_margin_right = margin
+	sb.texture_margin_bottom = margin
+	sb.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	sb.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	return sb
+
+static func create_pixel_bar_stylebox(tex: Texture2D) -> StyleBoxTexture:
+	var sb = StyleBoxTexture.new()
+	sb.texture = tex
+	sb.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE
+	sb.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	return sb
+
+

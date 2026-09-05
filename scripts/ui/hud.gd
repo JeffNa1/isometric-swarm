@@ -63,6 +63,9 @@ var surge_banner_timer: float = 0.0
 var active_card_scales: Dictionary = {}
 var active_card_targets: Dictionary = {}
 
+var health_chassis_base_pos: Vector2 = Vector2.ZERO
+var health_chassis_shake_frames: int = 0
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	level_up_panel.hide()
@@ -72,6 +75,9 @@ func _ready() -> void:
 	if chest_modal: chest_modal.hide()
 	if pause_modal: pause_modal.hide()
 	if low_hp_overlay: low_hp_overlay.hide()
+
+	if health_chassis:
+		health_chassis_base_pos = health_chassis.position
 
 	sound_mgr = get_node_or_null("/root/Main/SoundManager")
 	if not sound_mgr:
@@ -94,91 +100,54 @@ func _ready() -> void:
 	call_deferred("update_inventory")
 
 func _setup_hud_styling() -> void:
-	# XP Bar Style
-	var xp_bg = StyleBoxFlat.new()
-	xp_bg.bg_color = Color(0.03, 0.06, 0.12, 0.92)
-	xp_bg.border_color = Color(0.15, 0.35, 0.55, 0.8)
-	xp_bg.set_border_width_all(1)
-	xp_bg.set_corner_radius_all(4)
-	xp_bar.add_theme_stylebox_override("background", xp_bg)
+	# 1. XP Bar Style (Pixel Grooved Track + Segmented Neon Bar)
+	var xp_bg_tex = SpriteFactory.create_pixel_bar_bg_texture(Color(0.02, 0.04, 0.08, 0.95), Color(0.15, 0.35, 0.55, 0.8))
+	xp_bar.add_theme_stylebox_override("background", SpriteFactory.create_pixel_stylebox(xp_bg_tex, 3))
 
-	var xp_fill = StyleBoxFlat.new()
-	xp_fill.bg_color = Color(0.2, 0.9, 1.0, 1.0)
-	xp_fill.set_corner_radius_all(4)
-	xp_bar.add_theme_stylebox_override("fill", xp_fill)
+	var xp_fill_tex = SpriteFactory.create_pixel_bar_fill_texture(Color(0.2, 0.9, 1.0, 1.0))
+	xp_bar.add_theme_stylebox_override("fill", SpriteFactory.create_pixel_bar_stylebox(xp_fill_tex))
 
-	# Health Chassis Panel
+	# 2. Health Chassis Panel (Chunky Pixel Armor Frame with Rivet Bolts)
 	if health_chassis:
-		var ch_style = StyleBoxFlat.new()
-		ch_style.bg_color = Color(0.03, 0.06, 0.12, 0.92)
-		ch_style.border_color = Color(0.2, 0.55, 0.85, 0.75)
-		ch_style.set_border_width_all(2)
-		ch_style.set_corner_radius_all(8)
-		ch_style.shadow_color = Color(0.0, 0.25, 0.5, 0.3)
-		ch_style.shadow_size = 10
-		health_chassis.add_theme_stylebox_override("panel", ch_style)
+		var ch_tex = SpriteFactory.create_pixel_panel_texture(Color(0.25, 0.6, 0.9, 0.95), Color(0.03, 0.06, 0.12, 0.96), Color(0.4, 0.9, 1.0, 1.0), true)
+		health_chassis.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(ch_tex, 6))
 
-	# Inventory Tray Panel
+	# 3. Inventory Tray Panel (Recessed Cyber Module Plate)
 	if inventory_tray:
-		var tray_style = StyleBoxFlat.new()
-		tray_style.bg_color = Color(0.02, 0.05, 0.10, 0.88)
-		tray_style.border_color = Color(0.15, 0.35, 0.6, 0.65)
-		tray_style.set_border_width_all(2)
-		tray_style.set_corner_radius_all(8)
-		inventory_tray.add_theme_stylebox_override("panel", tray_style)
+		var tray_tex = SpriteFactory.create_pixel_panel_texture(Color(0.18, 0.38, 0.65, 0.85), Color(0.02, 0.05, 0.10, 0.92), Color(0.25, 0.7, 1.0, 0.8), false)
+		inventory_tray.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(tray_tex, 6))
 
-	# HP Bar Style
-	var hp_bg = StyleBoxFlat.new()
-	hp_bg.bg_color = Color(0.02, 0.04, 0.08, 0.95)
-	hp_bg.border_color = Color(0.12, 0.28, 0.45, 0.8)
-	hp_bg.set_border_width_all(1)
-	hp_bg.set_corner_radius_all(4)
-	hp_bar.add_theme_stylebox_override("background", hp_bg)
+	# 4. HP Bar Style (Recessed Track + Segmented LED Block Fill)
+	var hp_bg_tex = SpriteFactory.create_pixel_bar_bg_texture(Color(0.02, 0.03, 0.06, 0.98), Color(0.12, 0.28, 0.45, 0.9))
+	hp_bar.add_theme_stylebox_override("background", SpriteFactory.create_pixel_stylebox(hp_bg_tex, 3))
 
-	var hp_fill = StyleBoxFlat.new()
-	hp_fill.bg_color = Color(0.18, 0.95, 0.45, 1.0)
-	hp_fill.set_corner_radius_all(4)
-	hp_bar.add_theme_stylebox_override("fill", hp_fill)
+	var hp_fill_tex = SpriteFactory.create_pixel_bar_fill_texture(Color(0.18, 0.95, 0.45, 1.0))
+	hp_bar.add_theme_stylebox_override("fill", SpriteFactory.create_pixel_bar_stylebox(hp_fill_tex))
 
-	# Ghost HP Bar Style
+	# 5. Ghost HP Bar Style (Lagging Amber Notches)
 	if ghost_hp_bar:
 		var g_bg = StyleBoxEmpty.new()
 		ghost_hp_bar.add_theme_stylebox_override("background", g_bg)
-		var g_fill = StyleBoxFlat.new()
-		g_fill.bg_color = Color(1.0, 0.72, 0.15, 0.85)
-		g_fill.set_corner_radius_all(4)
-		ghost_hp_bar.add_theme_stylebox_override("fill", g_fill)
+		var g_fill_tex = SpriteFactory.create_pixel_bar_fill_texture(Color(1.0, 0.72, 0.15, 0.9))
+		ghost_hp_bar.add_theme_stylebox_override("fill", SpriteFactory.create_pixel_bar_stylebox(g_fill_tex))
 
-	# Boss Bar Style
+	# 6. Boss Bar Style
 	if boss_hp_bar:
-		var b_bg = StyleBoxFlat.new()
-		b_bg.bg_color = Color(0.12, 0.02, 0.04, 0.95)
-		b_bg.border_color = Color(0.9, 0.15, 0.25, 0.9)
-		b_bg.set_border_width_all(2)
-		b_bg.set_corner_radius_all(6)
-		boss_hp_bar.add_theme_stylebox_override("background", b_bg)
+		var b_bg_tex = SpriteFactory.create_pixel_bar_bg_texture(Color(0.1, 0.02, 0.03, 0.98), Color(0.8, 0.15, 0.25, 0.9))
+		boss_hp_bar.add_theme_stylebox_override("background", SpriteFactory.create_pixel_stylebox(b_bg_tex, 3))
 
-		var b_fill = StyleBoxFlat.new()
-		b_fill.bg_color = Color(1.0, 0.18, 0.28, 1.0)
-		b_fill.set_corner_radius_all(6)
-		boss_hp_bar.add_theme_stylebox_override("fill", b_fill)
+		var b_fill_tex = SpriteFactory.create_pixel_bar_fill_texture(Color(1.0, 0.18, 0.28, 1.0), Color(0.2, 0.02, 0.04, 1.0))
+		boss_hp_bar.add_theme_stylebox_override("fill", SpriteFactory.create_pixel_bar_stylebox(b_fill_tex))
 
-	# Dialog modals
-	var modal_style = StyleBoxFlat.new()
-	modal_style.bg_color = Color(0.04, 0.07, 0.14, 0.96)
-	modal_style.border_color = Color(0.25, 0.8, 1.0, 0.9)
-	modal_style.set_border_width_all(2)
-	modal_style.set_corner_radius_all(12)
-	modal_style.shadow_color = Color(0, 0, 0, 0.85)
-	modal_style.shadow_size = 24
-
+	# 7. Dialog Modals (Level-Up, Pause, Game Over in 9-Slice Pixel Frame)
+	var modal_tex = SpriteFactory.create_pixel_panel_texture(Color(0.25, 0.8, 1.0, 0.95), Color(0.03, 0.06, 0.13, 0.98), Color(1.0, 0.85, 0.25, 1.0), true)
+	var modal_style = SpriteFactory.create_pixel_stylebox(modal_tex, 6)
 	level_up_panel.add_theme_stylebox_override("panel", modal_style)
 	if pause_modal:
 		pause_modal.add_theme_stylebox_override("panel", modal_style)
 	if game_over_panel:
-		var go_style = modal_style.duplicate()
-		go_style.border_color = Color(1.0, 0.2, 0.3, 0.9)
-		game_over_panel.add_theme_stylebox_override("panel", go_style)
+		var go_tex = SpriteFactory.create_pixel_panel_texture(Color(1.0, 0.2, 0.3, 0.95), Color(0.10, 0.03, 0.05, 0.98), Color(1.0, 0.3, 0.3, 1.0), true)
+		game_over_panel.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(go_tex, 6))
 
 func _create_surge_banner() -> void:
 	surge_banner = Label.new()
@@ -205,18 +174,20 @@ func show_surge_warning(text: String) -> void:
 	surge_banner_timer = 3.8
 
 func _process(delta: float) -> void:
-	# Update card scale springs (runs even when paused!)
+	# Update card scale springs (quantized 10-fps retro tick for crisp pixel feel)
 	for c in active_card_scales.keys():
 		if is_instance_valid(c):
 			var cur = active_card_scales[c] as Vector2
 			var target = active_card_targets[c] as Vector2
-			var n_scale = cur.lerp(target, 20.0 * delta)
+			var n_scale = cur.lerp(target, 24.0 * delta)
+			n_scale.x = snappedf(n_scale.x, 0.01)
+			n_scale.y = snappedf(n_scale.y, 0.01)
 			active_card_scales[c] = n_scale
 			c.scale = n_scale
 
 	if surge_banner_timer > 0.0:
 		surge_banner_timer -= delta
-		var pulse = sin(Time.get_ticks_msec() * 0.01) * 0.3 + 0.7
+		var pulse = (int(Time.get_ticks_msec() / 150) % 2) * 0.35 + 0.65
 		surge_banner.modulate = Color(1.0, 1.0, 1.0, pulse)
 		if surge_banner_timer <= 0.0:
 			surge_banner.hide()
@@ -227,28 +198,39 @@ func _process(delta: float) -> void:
 		var secs = int(survival_seconds) % 60
 		timer_label.text = "%02d:%02d" % [mins, secs]
 		fps_label.text = "%d FPS" % Engine.get_frames_per_second()
-		
-		# Smooth health bar & ghost trail
-		hp_bar.value = lerp(float(hp_bar.value), target_hp, 18.0 * delta)
+
+		# Health chassis pixel jitter on hit
+		if health_chassis:
+			if health_chassis_shake_frames > 0:
+				health_chassis_shake_frames -= 1
+				var rx = randi_range(-2, 2)
+				var ry = randi_range(-2, 2)
+				health_chassis.position = health_chassis_base_pos + Vector2(rx, ry)
+			else:
+				health_chassis.position = health_chassis_base_pos
+
+		# Pixel segmented health bar & ghost trail
+		hp_bar.value = round(lerp(float(hp_bar.value), target_hp, 16.0 * delta))
 		if ghost_delay > 0.0:
 			ghost_delay -= delta
 		else:
-			ghost_hp = lerp(ghost_hp, target_hp, 6.0 * delta)
+			ghost_hp = round(lerp(ghost_hp, target_hp, 6.0 * delta))
 		if ghost_hp_bar:
 			ghost_hp_bar.value = ghost_hp
 
-		# Low HP warning vignette pulse
+		# Low HP warning vignette pulse (quantized 4-step retro strobe)
 		if max_hp > 0.0 and (target_hp / max_hp) < 0.3:
 			if low_hp_overlay:
 				low_hp_overlay.show()
-				var pulse = (sin(Time.get_ticks_msec() * 0.008) * 0.5 + 0.5) * 0.28
-				low_hp_overlay.color = Color(0.9, 0.05, 0.05, pulse)
+				var step = (int(Time.get_ticks_msec() / 120) % 4)
+				var alpha_levels = [0.08, 0.18, 0.28, 0.18]
+				low_hp_overlay.color = Color(0.9, 0.05, 0.05, alpha_levels[step])
 		else:
 			if low_hp_overlay:
 				low_hp_overlay.hide()
 
 		if boss_container and boss_container.visible:
-			boss_hp_bar.value = lerp(float(boss_hp_bar.value), target_boss_hp, 10.0 * delta)
+			boss_hp_bar.value = round(lerp(float(boss_hp_bar.value), target_boss_hp, 10.0 * delta))
 		radar_rect.queue_redraw()
 
 func show_boss_bar(b_name: String, cur_hp: float, maximum: float) -> void:
@@ -349,6 +331,7 @@ func _on_chest_claim_pressed() -> void:
 func update_health(current: float, maximum: float) -> void:
 	if current < target_hp:
 		ghost_delay = 0.35
+		health_chassis_shake_frames = 5
 	max_hp = maximum
 	target_hp = current
 	hp_bar.max_value = maximum
@@ -368,7 +351,9 @@ func update_health(current: float, maximum: float) -> void:
 		hp_percent_label.add_theme_color_override("font_color", col)
 
 	var fill_style = hp_bar.get_theme_stylebox("fill")
-	if fill_style is StyleBoxFlat:
+	if fill_style is StyleBoxTexture:
+		fill_style.texture = SpriteFactory.create_pixel_bar_fill_texture(col)
+	elif fill_style is StyleBoxFlat:
 		fill_style.bg_color = col
 
 func update_xp(current: int, target: int, lvl: int) -> void:
@@ -422,14 +407,10 @@ func update_inventory() -> void:
 
 func _create_inventory_slot(item_id: String, lvl: int, is_evolved: bool, is_weapon: bool) -> PanelContainer:
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(34, 34)
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.04, 0.07, 0.12, 0.9)
+	panel.custom_minimum_size = Vector2(36, 36)
 	var border_col = Color(1.0, 0.3, 0.6, 1.0) if is_evolved else (Color(0.25, 0.85, 1.0, 0.9) if is_weapon else Color(0.25, 0.95, 0.5, 0.9))
-	style.border_color = border_col
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(4)
-	panel.add_theme_stylebox_override("panel", style)
+	var slot_tex = SpriteFactory.create_pixel_panel_texture(border_col, Color(0.03, 0.05, 0.09, 0.95), border_col, false)
+	panel.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(slot_tex, 4))
 
 	var icon_rect = TextureRect.new()
 	icon_rect.texture = SpriteFactory.create_item_icon(item_id)
@@ -519,14 +500,12 @@ func _create_hologram_card(item: Dictionary) -> PanelContainer:
 			else:
 				cat_name = "⚡ CƯỜNG HÓA VŨ KHÍ"
 
-	var card_style = StyleBoxFlat.new()
-	card_style.bg_color = bg_col
-	card_style.border_color = glow_col
-	card_style.set_border_width_all(border_w)
-	card_style.set_corner_radius_all(14)
-	card_style.shadow_color = Color(glow_col.r * 0.25, glow_col.g * 0.25, glow_col.b * 0.25, 0.5)
-	card_style.shadow_size = 16
-	card.add_theme_stylebox_override("panel", card_style)
+	var card_tex_normal = SpriteFactory.create_pixel_panel_texture(glow_col, bg_col, glow_col, true)
+	var card_tex_hover = SpriteFactory.create_pixel_panel_texture(Color(1.0, 1.0, 1.0, 1.0), bg_col.lightened(0.06), Color(1.0, 1.0, 1.0, 1.0), true)
+	var card_style_normal = SpriteFactory.create_pixel_stylebox(card_tex_normal, 6)
+	var card_style_hover = SpriteFactory.create_pixel_stylebox(card_tex_hover, 6)
+
+	card.add_theme_stylebox_override("panel", card_style_normal)
 
 	var margin_c = MarginContainer.new()
 	margin_c.add_theme_constant_override("margin_left", 16)
@@ -550,19 +529,13 @@ func _create_hologram_card(item: Dictionary) -> PanelContainer:
 	tag.add_theme_font_size_override("font_size", 12)
 	vbox.add_child(tag)
 
-	# 2. Icon 3D Pedestal
+	# 2. Icon 3D Pixel Pedestal
 	var icon_pedestal = PanelContainer.new()
 	icon_pedestal.custom_minimum_size = Vector2(72, 72)
 	icon_pedestal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	icon_pedestal.mouse_filter = Control.MOUSE_FILTER_PASS
-	var ip_style = StyleBoxFlat.new()
-	ip_style.bg_color = Color(0.02, 0.04, 0.08, 0.95)
-	ip_style.border_color = glow_col * 0.85
-	ip_style.set_border_width_all(2)
-	ip_style.set_corner_radius_all(10)
-	ip_style.shadow_color = Color(glow_col.r * 0.3, glow_col.g * 0.3, glow_col.b * 0.3, 0.4)
-	ip_style.shadow_size = 8
-	icon_pedestal.add_theme_stylebox_override("panel", ip_style)
+	var ip_tex = SpriteFactory.create_pixel_panel_texture(glow_col * 0.85, Color(0.02, 0.04, 0.08, 0.95), glow_col, true)
+	icon_pedestal.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(ip_tex, 6))
 
 	var icon_rect = TextureRect.new()
 	icon_rect.texture = SpriteFactory.create_item_icon(item.id)
@@ -600,33 +573,27 @@ func _create_hologram_card(item: Dictionary) -> PanelContainer:
 		var cur_lvl = item.get("lvl", 0)
 		for seg_i in range(5):
 			var seg = Panel.new()
-			seg.custom_minimum_size = Vector2(28, 6)
-			var s_style = StyleBoxFlat.new()
-			s_style.set_corner_radius_all(2)
-			if seg_i < cur_lvl:
-				s_style.bg_color = glow_col
-			elif seg_i == cur_lvl:
-				s_style.bg_color = Color(1.0, 1.0, 1.0, 0.95)
-			else:
-				s_style.bg_color = Color(0.12, 0.18, 0.28, 0.8)
-			seg.add_theme_stylebox_override("panel", s_style)
+			seg.custom_minimum_size = Vector2(28, 8)
+			var is_lit = (seg_i < cur_lvl)
+			var is_next = (seg_i == cur_lvl)
+			var seg_col = glow_col if is_lit else (Color(1.0, 1.0, 1.0, 0.95) if is_next else Color(0.12, 0.18, 0.28, 0.8))
+			var seg_border = glow_col if (is_lit or is_next) else Color(0.08, 0.12, 0.18, 0.9)
+			var seg_tex = SpriteFactory.create_pixel_button_texture(seg_border, seg_col, false, is_next)
+			seg.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(seg_tex, 2))
 			meter_hbox.add_child(seg)
 	vbox.add_child(meter_hbox)
 
-	# 5. Stat Boost Badge (Pill)
+	# 5. Stat Boost Badge (Pixel Pill)
 	if item.has("stat_bonus") and str(item.stat_bonus) != "":
 		var pill_panel = PanelContainer.new()
 		pill_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		pill_panel.mouse_filter = Control.MOUSE_FILTER_PASS
-		var pill_style = StyleBoxFlat.new()
-		pill_style.bg_color = Color(glow_col.r * 0.15, glow_col.g * 0.15, glow_col.b * 0.15, 0.8)
-		pill_style.border_color = glow_col * 0.85
-		pill_style.set_border_width_all(1)
-		pill_style.set_corner_radius_all(8)
-		pill_panel.add_theme_stylebox_override("panel", pill_style)
+		var pill_bg = Color(glow_col.r * 0.15, glow_col.g * 0.15, glow_col.b * 0.15, 0.85)
+		var pill_tex = SpriteFactory.create_pixel_panel_texture(glow_col * 0.85, pill_bg, Color.TRANSPARENT, false)
+		pill_panel.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(pill_tex, 4))
 
 		var pill_lbl = Label.new()
-		pill_lbl.text = "  %s  " % item.stat_bonus
+		pill_lbl.text = "  [ %s ]  " % item.stat_bonus
 		pill_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		pill_lbl.add_theme_font_size_override("font_size", 11)
 		pill_lbl.add_theme_color_override("font_color", glow_col)
@@ -643,28 +610,22 @@ func _create_hologram_card(item: Dictionary) -> PanelContainer:
 	desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(desc)
 
-	# 7. Dedicated Action Button
+	# 7. Dedicated Action Button (3D Pixel Bevel)
 	var btn_action = Button.new()
-	btn_action.custom_minimum_size = Vector2(250, 40)
+	btn_action.custom_minimum_size = Vector2(250, 42)
 	btn_action.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	btn_action.text = "👑 TIẾN HÓA NGAY ▶" if item.rarity == "evo" else "⚡ BÚ NÂNG CẤP NÀY ▶"
 	btn_action.add_theme_font_size_override("font_size", 13)
+	btn_action.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
-	var btn_normal = StyleBoxFlat.new()
-	btn_normal.bg_color = Color(0.06, 0.12, 0.22, 0.92)
-	btn_normal.border_color = glow_col
-	btn_normal.set_border_width_all(1)
-	btn_normal.set_corner_radius_all(8)
-	btn_action.add_theme_stylebox_override("normal", btn_normal)
+	var btn_norm_tex = SpriteFactory.create_pixel_button_texture(glow_col, Color(0.06, 0.12, 0.22, 0.95), false, false)
+	btn_action.add_theme_stylebox_override("normal", SpriteFactory.create_pixel_stylebox(btn_norm_tex, 4))
 
-	var btn_hover = StyleBoxFlat.new()
-	btn_hover.bg_color = Color(glow_col.r * 0.35, glow_col.g * 0.35, glow_col.b * 0.35, 1.0)
-	btn_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)
-	btn_hover.set_border_width_all(2)
-	btn_hover.set_corner_radius_all(8)
-	btn_hover.shadow_color = glow_col * 0.5
-	btn_hover.shadow_size = 10
-	btn_action.add_theme_stylebox_override("hover", btn_hover)
+	var btn_hov_tex = SpriteFactory.create_pixel_button_texture(Color(1, 1, 1), Color(glow_col.r * 0.35, glow_col.g * 0.35, glow_col.b * 0.35, 1.0), false, true)
+	btn_action.add_theme_stylebox_override("hover", SpriteFactory.create_pixel_stylebox(btn_hov_tex, 4))
+
+	var btn_press_tex = SpriteFactory.create_pixel_button_texture(glow_col, Color(0.02, 0.05, 0.1, 1.0), true, false)
+	btn_action.add_theme_stylebox_override("pressed", SpriteFactory.create_pixel_stylebox(btn_press_tex, 4))
 
 	vbox.add_child(btn_action)
 
@@ -684,16 +645,14 @@ func _create_hologram_card(item: Dictionary) -> PanelContainer:
 	card.mouse_entered.connect(func():
 		active_card_targets[card] = Vector2(1.05, 1.05)
 		card.z_index = 10
-		card_style.shadow_size = 24
-		card_style.border_color = Color(1.0, 1.0, 1.0, 1.0)
+		card.add_theme_stylebox_override("panel", card_style_hover)
 		if sound_mgr and sound_mgr.has_method("play_ui_hover"):
 			sound_mgr.play_ui_hover()
 	)
 	card.mouse_exited.connect(func():
 		active_card_targets[card] = Vector2(1.0, 1.0)
 		card.z_index = 0
-		card_style.shadow_size = 16
-		card_style.border_color = glow_col
+		card.add_theme_stylebox_override("panel", card_style_normal)
 	)
 
 	btn_action.mouse_entered.connect(func():
