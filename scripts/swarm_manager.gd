@@ -183,17 +183,18 @@ func _physics_process(delta: float) -> void:
 		var iso_dir = Vector2(norm_to_player.x, norm_to_player.y * 0.75).normalized()
 
 		var sep_force = Vector2.ZERO
-		var neighbors = spatial_grid.get_in_cell_and_adjacent(pos)
-		var rad_i = radii[i]
+		if dist_to_player < 950.0:
+			var neighbors = spatial_grid.get_neighbors_capped(pos, 6)
+			var rad_i = radii[i]
 
-		for n_idx in neighbors:
-			if n_idx != i and n_idx < active_count:
-				var diff = pos - positions[n_idx]
-				var d_sq = diff.length_squared()
-				var min_d = rad_i + radii[n_idx]
-				if d_sq < min_d * min_d and d_sq > 0.01:
-					var d = sqrt(d_sq)
-					sep_force += (diff / d) * (min_d - d) * 14.0
+			for n_idx in neighbors:
+				if n_idx != i and n_idx < active_count:
+					var diff = pos - positions[n_idx]
+					var d_sq = diff.length_squared()
+					var min_d = rad_i + radii[n_idx]
+					if d_sq < min_d * min_d and d_sq > 0.01:
+						var d = sqrt(d_sq)
+						sep_force += (diff / d) * (min_d - d) * 14.0
 
 		var target_vel = (iso_dir * speeds[i]) + sep_force
 		velocities[i] = velocities[i].move_toward(target_vel, 750.0 * delta)
@@ -395,7 +396,8 @@ func _kill_enemy(idx: int) -> void:
 		var blood_col = Color(1.6, 0.2, 0.2, 1.0)
 		if e_type == 1: blood_col = Color(1.4, 0.3, 1.8, 1.0)
 		elif e_type == 2: blood_col = Color(1.8, 0.8, 0.1, 1.0)
-		particle_mgr.spawn_blood_burst(pos, blood_col, 12)
+		var p_count = 16 if is_boss else (4 if e_type == 1 else 3)
+		particle_mgr.spawn_blood_burst(pos, blood_col, p_count)
 
 	# Swap-and-pop O(1)
 	var last_idx = active_count - 1

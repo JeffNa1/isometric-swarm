@@ -1,6 +1,6 @@
 extends Node2D
 
-const MAX_PARTICLES: int = 1500
+const MAX_PARTICLES: int = 600
 
 var p_pos: PackedVector2Array = PackedVector2Array()
 var p_vel: PackedVector2Array = PackedVector2Array()

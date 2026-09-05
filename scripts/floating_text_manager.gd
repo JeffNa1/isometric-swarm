@@ -42,6 +42,19 @@ func spawn_damage(pos: Vector2, amount: float, is_crit: bool = false) -> void:
 
 	active_count += 1
 
+func spawn_text(pos: Vector2, text: String, col: Color = Color(1.0, 1.0, 1.0, 1.0)) -> void:
+	if active_count >= MAX_TEXTS:
+		return
+
+	var idx = active_count
+	t_pos[idx] = pos + Vector2(0, -18)
+	t_vel[idx] = Vector2(0, -60)
+	t_life[idx] = 1.1
+	t_is_crit[idx] = true
+	t_str[idx] = text
+	t_color[idx] = col
+	active_count += 1
+
 func _process(delta: float) -> void:
 	if active_count == 0:
 		return

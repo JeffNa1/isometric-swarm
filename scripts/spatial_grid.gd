@@ -47,3 +47,19 @@ func get_in_cell_and_adjacent(pos: Vector2) -> Array[int]:
 			if grid.has(key):
 				result.append_array(grid[key])
 	return result
+
+func get_neighbors_capped(pos: Vector2, max_count: int = 8) -> Array[int]:
+	var cx: int = int(floor(pos.x * inv_cell_size))
+	var cy: int = int(floor(pos.y * inv_cell_size))
+	var result: Array[int] = []
+	
+	for ox in range(-1, 2):
+		for oy in range(-1, 2):
+			var key = Vector2i(cx + ox, cy + oy)
+			if grid.has(key):
+				var cell_arr: Array = grid[key]
+				for idx in cell_arr:
+					result.append(idx)
+					if result.size() >= max_count:
+						return result
+	return result

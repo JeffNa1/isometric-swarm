@@ -248,11 +248,20 @@ func _on_enemy_killed(xp_val: int, pos: Vector2, is_boss: bool) -> void:
 
 	# Spawn physical XP Gem (Drop chance 65% for fodder, 100% for bosses)
 	if randf() < 0.65 or is_boss:
-		var gem = GemScene.instantiate()
-		gem.xp_value = xp_val
-		gem.is_super_gem = is_boss
-		gem.global_position = pos
-		entities_container.call_deferred("add_child", gem)
+		var gems = get_tree().get_nodes_in_group("gems")
+		if gems.size() >= 250 and not is_boss:
+			# Vampire Survivors gem consolidation: upgrade an existing gem instead of creating new node
+			var target_gem = gems[randi() % gems.size()]
+			if is_instance_valid(target_gem):
+				target_gem.xp_value += xp_val
+				target_gem.is_super_gem = true
+				target_gem.queue_redraw()
+		else:
+			var gem = GemScene.instantiate()
+			gem.xp_value = xp_val
+			gem.is_super_gem = is_boss
+			gem.global_position = pos
+			entities_container.call_deferred("add_child", gem)
 
 func _on_player_died() -> void:
 	hud.show_game_over(player.level)
