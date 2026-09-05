@@ -2,8 +2,8 @@ shader_type canvas_item;
 
 uniform vec4 bg_color : source_color = vec4(0.04, 0.05, 0.08, 1.0);
 uniform vec4 line_color : source_color = vec4(0.10, 0.16, 0.28, 0.6);
-uniform vec4 major_line_color : source_color = vec4(0.20, 0.45, 0.90, 1.2); # HDR Blue
-uniform vec4 border_color : source_color = vec4(0.3, 0.8, 1.5, 1.5);      # HDR Border
+uniform vec4 major_line_color : source_color = vec4(0.20, 0.45, 0.90, 1.2); // HDR Blue
+uniform vec4 border_color : source_color = vec4(0.3, 0.8, 1.5, 1.5);      // HDR Border
 uniform float grid_scale : hint_range(16.0, 256.0) = 64.0;
 uniform vec2 arena_size = vec2(10000.0, 10000.0);
 
