@@ -1,5 +1,7 @@
 extends Node2D
 
+const MainMenu = preload("res://scripts/ui/main_menu.gd")
+
 const MAX_TEXTS: int = 60
 
 var t_pos: PackedVector2Array = PackedVector2Array()

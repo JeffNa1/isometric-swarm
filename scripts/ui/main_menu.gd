@@ -1,3 +1,4 @@
+class_name MainMenu
 extends Control
 
 const SpriteFactory = preload("res://scripts/sprite_factory.gd")

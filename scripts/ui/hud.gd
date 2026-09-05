@@ -1,5 +1,7 @@
 extends CanvasLayer
 
+const SpriteFactory = preload("res://scripts/sprite_factory.gd")
+
 signal upgrade_selected(upgrade_id: String)
 
 @onready var xp_bar: ProgressBar = $TopBar/XPBar
