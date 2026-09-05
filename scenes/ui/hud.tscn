@@ -139,54 +139,80 @@ anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -60.0
+offset_top = -80.0
 grow_horizontal = 2
 grow_vertical = 0
 
-[node name="GhostHPBar" type="ProgressBar" parent="BottomBar"]
+[node name="HealthChassis" type="PanelContainer" parent="BottomBar"]
 layout_mode = 1
-offset_left = 24.0
-offset_top = 15.0
-offset_right = 260.0
-offset_bottom = 42.0
-value = 100.0
-show_percentage = false
+offset_left = 20.0
+offset_top = 10.0
+offset_right = 330.0
+offset_bottom = 68.0
 
-[node name="HPBar" type="ProgressBar" parent="BottomBar"]
-layout_mode = 1
-offset_left = 24.0
-offset_top = 15.0
-offset_right = 260.0
-offset_bottom = 42.0
-value = 100.0
-show_percentage = false
+[node name="VBox" type="VBoxContainer" parent="BottomBar/HealthChassis"]
+layout_mode = 2
+theme_override_constants/separation = 4
 
-[node name="HPLabel" type="Label" parent="BottomBar/HPBar"]
+[node name="HPHeader" type="HBoxContainer" parent="BottomBar/HealthChassis/VBox"]
+layout_mode = 2
+
+[node name="CoreIcon" type="Label" parent="BottomBar/HealthChassis/VBox/HPHeader"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.45, 1)
+theme_override_font_sizes/font_size = 12
+text = "❤️ NĂNG LƯỢNG LÕI"
+
+[node name="HPPercent" type="Label" parent="BottomBar/HealthChassis/VBox/HPHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.3, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "100%"
+horizontal_alignment = 1
+
+[node name="HPLabel" type="Label" parent="BottomBar/HealthChassis/VBox/HPHeader"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.98, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "120 / 120 HP"
+horizontal_alignment = 2
+
+[node name="BarStack" type="Control" parent="BottomBar/HealthChassis/VBox"]
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+
+[node name="GhostHPBar" type="ProgressBar" parent="BottomBar/HealthChassis/VBox/BarStack"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-text = "120 / 120 HP"
-horizontal_alignment = 1
-vertical_alignment = 1
+value = 100.0
+show_percentage = false
 
-[node name="InventoryBox" type="HBoxContainer" parent="BottomBar"]
+[node name="HPBar" type="ProgressBar" parent="BottomBar/HealthChassis/VBox/BarStack"]
 layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
+anchors_preset = 15
+anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -240.0
-offset_top = -48.0
-offset_right = 240.0
-offset_bottom = -12.0
 grow_horizontal = 2
-grow_vertical = 0
-theme_override_constants/separation = 6
-alignment = 1
+grow_vertical = 2
+value = 100.0
+show_percentage = false
+
+[node name="InventoryTray" type="PanelContainer" parent="BottomBar"]
+layout_mode = 1
+offset_left = 346.0
+offset_top = 10.0
+offset_right = 840.0
+offset_bottom = 68.0
+
+[node name="InventoryBox" type="HBoxContainer" parent="BottomBar/InventoryTray"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 0
 
 [node name="RadarContainer" type="PanelContainer" parent="."]
 anchors_preset = 3
@@ -204,16 +230,26 @@ grow_vertical = 0
 [node name="RadarView" type="Control" parent="RadarContainer"]
 layout_mode = 2
 
+[node name="LevelUpDimming" type="ColorRect" parent="."]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.01, 0.02, 0.05, 0.82)
+
 [node name="LevelUpModal" type="PanelContainer" parent="."]
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -440.0
-offset_top = -200.0
-offset_right = 440.0
-offset_bottom = 200.0
+offset_left = -480.0
+offset_top = -240.0
+offset_right = 480.0
+offset_bottom = 240.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -221,16 +257,27 @@ grow_vertical = 2
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Title" type="Label" parent="LevelUpModal/VBox"]
+[node name="HeaderBox" type="VBoxContainer" parent="LevelUpModal/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="LevelUpModal/VBox/HeaderBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.25, 1)
 theme_override_font_sizes/font_size = 24
-text = "⭐ LÊN CẤP! CHỌN VŨ KHÍ DIỆT BẦY ĐÀN ⭐"
+text = "⚡ THĂNG CẤP HỆ THỐNG CHIẾN ĐẤU ⚡"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="LevelUpModal/VBox/HeaderBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.88, 1, 0.9)
+theme_override_font_sizes/font_size = 13
+text = "CHỌN 1 TRONG CÁC MODULE CHIẾN THUẬT DƯỚI ĐÂY ĐỂ ĐỘT PHÁ SỨC MẠNH"
 horizontal_alignment = 1
 
 [node name="CardContainer" type="HBoxContainer" parent="LevelUpModal/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 20
 alignment = 1
 
 [node name="ChestModal" type="PanelContainer" parent="."]

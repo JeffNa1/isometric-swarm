@@ -11,13 +11,17 @@ signal upgrade_selected(upgrade_id: String)
 @onready var fps_label: Label = $TopBar/FPSLabel
 @onready var swarm_label: Label = $TopBar/SwarmLabel
 
-@onready var hp_bar: ProgressBar = $BottomBar/HPBar
-@onready var hp_label: Label = $BottomBar/HPBar/HPLabel
-@onready var ghost_hp_bar: ProgressBar = $BottomBar/GhostHPBar
-@onready var inventory_box: HBoxContainer = $BottomBar/InventoryBox
+@onready var health_chassis: PanelContainer = $BottomBar/HealthChassis
+@onready var hp_bar: ProgressBar = $BottomBar/HealthChassis/VBox/BarStack/HPBar
+@onready var ghost_hp_bar: ProgressBar = $BottomBar/HealthChassis/VBox/BarStack/GhostHPBar
+@onready var hp_label: Label = $BottomBar/HealthChassis/VBox/HPHeader/HPLabel
+@onready var hp_percent_label: Label = $BottomBar/HealthChassis/VBox/HPHeader/HPPercent
+@onready var inventory_tray: PanelContainer = $BottomBar/InventoryTray
+@onready var inventory_box: HBoxContainer = $BottomBar/InventoryTray/InventoryBox
 @onready var low_hp_overlay: ColorRect = $LowHPOverlay
 
 @onready var radar_rect: Control = $RadarContainer/RadarView
+@onready var level_up_dimming: ColorRect = $LevelUpDimming
 @onready var level_up_panel: PanelContainer = $LevelUpModal
 @onready var card_container: HBoxContainer = $LevelUpModal/VBox/CardContainer
 @onready var game_over_panel: PanelContainer = $GameOverModal
@@ -62,6 +66,7 @@ var active_card_targets: Dictionary = {}
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	level_up_panel.hide()
+	if level_up_dimming: level_up_dimming.hide()
 	game_over_panel.hide()
 	if boss_container: boss_container.hide()
 	if chest_modal: chest_modal.hide()
@@ -102,17 +107,37 @@ func _setup_hud_styling() -> void:
 	xp_fill.set_corner_radius_all(4)
 	xp_bar.add_theme_stylebox_override("fill", xp_fill)
 
+	# Health Chassis Panel
+	if health_chassis:
+		var ch_style = StyleBoxFlat.new()
+		ch_style.bg_color = Color(0.03, 0.06, 0.12, 0.92)
+		ch_style.border_color = Color(0.2, 0.55, 0.85, 0.75)
+		ch_style.set_border_width_all(2)
+		ch_style.set_corner_radius_all(8)
+		ch_style.shadow_color = Color(0.0, 0.25, 0.5, 0.3)
+		ch_style.shadow_size = 10
+		health_chassis.add_theme_stylebox_override("panel", ch_style)
+
+	# Inventory Tray Panel
+	if inventory_tray:
+		var tray_style = StyleBoxFlat.new()
+		tray_style.bg_color = Color(0.02, 0.05, 0.10, 0.88)
+		tray_style.border_color = Color(0.15, 0.35, 0.6, 0.65)
+		tray_style.set_border_width_all(2)
+		tray_style.set_corner_radius_all(8)
+		inventory_tray.add_theme_stylebox_override("panel", tray_style)
+
 	# HP Bar Style
 	var hp_bg = StyleBoxFlat.new()
-	hp_bg.bg_color = Color(0.04, 0.07, 0.11, 0.92)
-	hp_bg.border_color = Color(0.18, 0.35, 0.55, 0.85)
-	hp_bg.set_border_width_all(2)
-	hp_bg.set_corner_radius_all(6)
+	hp_bg.bg_color = Color(0.02, 0.04, 0.08, 0.95)
+	hp_bg.border_color = Color(0.12, 0.28, 0.45, 0.8)
+	hp_bg.set_border_width_all(1)
+	hp_bg.set_corner_radius_all(4)
 	hp_bar.add_theme_stylebox_override("background", hp_bg)
 
 	var hp_fill = StyleBoxFlat.new()
 	hp_fill.bg_color = Color(0.18, 0.95, 0.45, 1.0)
-	hp_fill.set_corner_radius_all(6)
+	hp_fill.set_corner_radius_all(4)
 	hp_bar.add_theme_stylebox_override("fill", hp_fill)
 
 	# Ghost HP Bar Style
@@ -121,7 +146,7 @@ func _setup_hud_styling() -> void:
 		ghost_hp_bar.add_theme_stylebox_override("background", g_bg)
 		var g_fill = StyleBoxFlat.new()
 		g_fill.bg_color = Color(1.0, 0.72, 0.15, 0.85)
-		g_fill.set_corner_radius_all(6)
+		g_fill.set_corner_radius_all(4)
 		ghost_hp_bar.add_theme_stylebox_override("fill", g_fill)
 
 	# Boss Bar Style
@@ -143,9 +168,9 @@ func _setup_hud_styling() -> void:
 	modal_style.bg_color = Color(0.04, 0.07, 0.14, 0.96)
 	modal_style.border_color = Color(0.25, 0.8, 1.0, 0.9)
 	modal_style.set_border_width_all(2)
-	modal_style.set_corner_radius_all(10)
-	modal_style.shadow_color = Color(0, 0, 0, 0.8)
-	modal_style.shadow_size = 20
+	modal_style.set_corner_radius_all(12)
+	modal_style.shadow_color = Color(0, 0, 0, 0.85)
+	modal_style.shadow_size = 24
 
 	level_up_panel.add_theme_stylebox_override("panel", modal_style)
 	if pause_modal:
@@ -331,6 +356,21 @@ func update_health(current: float, maximum: float) -> void:
 		ghost_hp_bar.max_value = maximum
 	hp_label.text = "%d / %d HP" % [int(current), int(maximum)]
 
+	var pct = clamp(current / max(1.0, maximum), 0.0, 1.0)
+	var col = Color(0.18, 0.95, 0.45, 1.0)
+	if pct <= 0.25:
+		col = Color(1.0, 0.22, 0.25, 1.0)
+	elif pct <= 0.5:
+		col = Color(1.0, 0.75, 0.2, 1.0)
+
+	if hp_percent_label:
+		hp_percent_label.text = "%d%%" % int(pct * 100)
+		hp_percent_label.add_theme_color_override("font_color", col)
+
+	var fill_style = hp_bar.get_theme_stylebox("fill")
+	if fill_style is StyleBoxFlat:
+		fill_style.bg_color = col
+
 func update_xp(current: int, target: int, lvl: int) -> void:
 	xp_bar.max_value = target
 	xp_bar.value = current
@@ -439,136 +479,229 @@ func show_level_up(lvl: int) -> void:
 			picks.append(item)
 
 	for item in picks:
-		var btn = Button.new()
-		btn.custom_minimum_size = Vector2(260, 330)
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.text = ""
-		btn.pivot_offset = Vector2(130, 165)
-		active_card_scales[btn] = Vector2.ONE
-		active_card_targets[btn] = Vector2.ONE
+		var card = _create_hologram_card(item)
+		card_container.add_child(card)
 
-		# Rarity Styling
-		var style = StyleBoxFlat.new()
-		style.set_corner_radius_all(10)
-		style.set_border_width_all(2)
-
-		var glow_col = Color(0.25, 0.85, 1.0, 1.0)
-		var cat_name = "[VŨ KHÍ MỚI]"
-		match item.rarity:
-			"evo":
-				style.bg_color = Color(0.16, 0.05, 0.12, 0.96)
-				glow_col = Color(1.0, 0.28, 0.65, 1.0) # Mythic Pink
-				cat_name = "[TIẾN HÓA TỐI THƯỢNG]"
-			"passive":
-				style.bg_color = Color(0.04, 0.13, 0.08, 0.96)
-				glow_col = Color(0.25, 1.0, 0.55, 1.0) # Emerald
-				cat_name = "[NỘI TẠI CÔNG NGHỆ]"
-			_:
-				style.bg_color = Color(0.05, 0.09, 0.18, 0.96)
-				glow_col = Color(0.25, 0.85, 1.0, 1.0) # Cyan
-				if not item.stars.begins_with("✨"):
-					cat_name = "[CƯỜNG HÓA VŨ KHÍ]"
-
-		style.border_color = glow_col
-		style.shadow_color = Color(glow_col.r * 0.15, glow_col.g * 0.15, glow_col.b * 0.15, 0.45)
-		style.shadow_size = 14
-		btn.add_theme_stylebox_override("normal", style)
-
-		var hover_style = style.duplicate()
-		hover_style.bg_color = style.bg_color.lightened(0.12)
-		hover_style.border_color = Color(1.0, 1.0, 1.0, 1.0)
-		hover_style.set_border_width_all(3)
-		hover_style.shadow_size = 22
-		btn.add_theme_stylebox_override("hover", hover_style)
-
-		# Build Card Internal Layout
-		var vbox = VBoxContainer.new()
-		vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-		vbox.offset_left = 16.0
-		vbox.offset_right = -16.0
-		vbox.offset_top = 16.0
-		vbox.offset_bottom = -16.0
-		vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		vbox.add_theme_constant_override("separation", 10)
-
-		# Category ribbon
-		var tag = Label.new()
-		tag.text = cat_name
-		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		tag.add_theme_color_override("font_color", glow_col)
-		tag.add_theme_font_size_override("font_size", 12)
-		vbox.add_child(tag)
-
-		# Icon Box
-		var icon_panel = PanelContainer.new()
-		icon_panel.custom_minimum_size = Vector2(64, 64)
-		icon_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		icon_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var ip_style = StyleBoxFlat.new()
-		ip_style.bg_color = Color(0.02, 0.04, 0.08, 0.9)
-		ip_style.border_color = glow_col * 0.8
-		ip_style.set_border_width_all(2)
-		ip_style.set_corner_radius_all(8)
-		icon_panel.add_theme_stylebox_override("panel", ip_style)
-
-		var icon_rect = TextureRect.new()
-		icon_rect.texture = SpriteFactory.create_item_icon(item.id)
-		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon_rect.custom_minimum_size = Vector2(48, 48)
-		icon_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		icon_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon_panel.add_child(icon_rect)
-		vbox.add_child(icon_panel)
-
-		# Title
-		var title = Label.new()
-		title.text = item.title
-		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		title.autowrap_mode = TextServer.AUTOWRAP_WORD
-		title.add_theme_font_size_override("font_size", 15)
-		title.add_theme_color_override("font_color", Color(0.98, 0.98, 1.0, 1.0))
-		vbox.add_child(title)
-
-		# Stars progression
-		var stars_lbl = Label.new()
-		stars_lbl.text = item.stars
-		stars_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		stars_lbl.add_theme_font_size_override("font_size", 13)
-		stars_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.3, 1.0) if item.rarity != "evo" else Color(1.0, 0.5, 0.8, 1.0))
-		vbox.add_child(stars_lbl)
-
-		# Description
-		var desc = Label.new()
-		desc.text = item.desc
-		desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-		desc.add_theme_font_size_override("font_size", 12)
-		desc.add_theme_color_override("font_color", Color(0.82, 0.88, 0.95, 0.88))
-		vbox.add_child(desc)
-
-		btn.add_child(vbox)
-
-		# Connect Hover & Click
-		var cur_btn = btn
-		var up_id = item.id
-		btn.mouse_entered.connect(func():
-			active_card_targets[cur_btn] = Vector2(1.06, 1.06)
-			if sound_mgr and sound_mgr.has_method("play_ui_hover"):
-				sound_mgr.play_ui_hover()
-		)
-		btn.mouse_exited.connect(func():
-			active_card_targets[cur_btn] = Vector2(1.0, 1.0)
-		)
-		btn.pressed.connect(func():
-			if sound_mgr and sound_mgr.has_method("play_ui_click"):
-				sound_mgr.play_ui_click()
-			_choose_upgrade(up_id)
-		)
-		card_container.add_child(btn)
-
+	if level_up_dimming:
+		level_up_dimming.show()
 	level_up_panel.show()
+
+func _create_hologram_card(item: Dictionary) -> PanelContainer:
+	var card = PanelContainer.new()
+	card.custom_minimum_size = Vector2(290, 380)
+	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	card.pivot_offset = Vector2(145, 190)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	active_card_scales[card] = Vector2.ONE
+	active_card_targets[card] = Vector2.ONE
+
+	var glow_col = Color(0.25, 0.85, 1.0, 1.0)
+	var cat_name = "[ VŨ KHÍ MỚI ]"
+	var border_w = 2
+	var bg_col = Color(0.04, 0.08, 0.16, 0.96)
+
+	match item.rarity:
+		"evo":
+			bg_col = Color(0.16, 0.05, 0.14, 0.97)
+			glow_col = Color(1.0, 0.28, 0.65, 1.0)
+			cat_name = "👑 TIẾN HÓA TỐI THƯỢNG"
+			border_w = 3
+		"passive":
+			bg_col = Color(0.03, 0.12, 0.07, 0.96)
+			glow_col = Color(0.25, 1.0, 0.55, 1.0)
+			cat_name = "💠 NỘI TẠI CÔNG NGHỆ"
+		_:
+			bg_col = Color(0.04, 0.09, 0.18, 0.96)
+			glow_col = Color(0.25, 0.85, 1.0, 1.0)
+			if item.get("is_new", false):
+				cat_name = "✨ VŨ KHÍ MỚI"
+			else:
+				cat_name = "⚡ CƯỜNG HÓA VŨ KHÍ"
+
+	var card_style = StyleBoxFlat.new()
+	card_style.bg_color = bg_col
+	card_style.border_color = glow_col
+	card_style.set_border_width_all(border_w)
+	card_style.set_corner_radius_all(14)
+	card_style.shadow_color = Color(glow_col.r * 0.25, glow_col.g * 0.25, glow_col.b * 0.25, 0.5)
+	card_style.shadow_size = 16
+	card.add_theme_stylebox_override("panel", card_style)
+
+	var margin_c = MarginContainer.new()
+	margin_c.add_theme_constant_override("margin_left", 16)
+	margin_c.add_theme_constant_override("margin_right", 16)
+	margin_c.add_theme_constant_override("margin_top", 16)
+	margin_c.add_theme_constant_override("margin_bottom", 16)
+	margin_c.mouse_filter = Control.MOUSE_FILTER_PASS
+	card.add_child(margin_c)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	vbox.alignment = BoxContainer.ALIGNMENT_BEGIN
+	vbox.mouse_filter = Control.MOUSE_FILTER_PASS
+	margin_c.add_child(vbox)
+
+	# 1. Rarity Header Badge
+	var tag = Label.new()
+	tag.text = cat_name
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.add_theme_color_override("font_color", glow_col)
+	tag.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(tag)
+
+	# 2. Icon 3D Pedestal
+	var icon_pedestal = PanelContainer.new()
+	icon_pedestal.custom_minimum_size = Vector2(72, 72)
+	icon_pedestal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon_pedestal.mouse_filter = Control.MOUSE_FILTER_PASS
+	var ip_style = StyleBoxFlat.new()
+	ip_style.bg_color = Color(0.02, 0.04, 0.08, 0.95)
+	ip_style.border_color = glow_col * 0.85
+	ip_style.set_border_width_all(2)
+	ip_style.set_corner_radius_all(10)
+	ip_style.shadow_color = Color(glow_col.r * 0.3, glow_col.g * 0.3, glow_col.b * 0.3, 0.4)
+	ip_style.shadow_size = 8
+	icon_pedestal.add_theme_stylebox_override("panel", ip_style)
+
+	var icon_rect = TextureRect.new()
+	icon_rect.texture = SpriteFactory.create_item_icon(item.id)
+	icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon_rect.custom_minimum_size = Vector2(48, 48)
+	icon_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon_pedestal.add_child(icon_rect)
+	vbox.add_child(icon_pedestal)
+
+	# 3. Title
+	var title = Label.new()
+	title.text = item.title
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD
+	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
+	vbox.add_child(title)
+
+	# 4. 5-Segment LED Level Meter
+	var meter_hbox = HBoxContainer.new()
+	meter_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	meter_hbox.add_theme_constant_override("separation", 6)
+	meter_hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	if item.rarity == "evo":
+		var evo_meter = Label.new()
+		evo_meter.text = "👑 TIẾN HÓA TỐI THƯỢNG - MAX LEVEL"
+		evo_meter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		evo_meter.add_theme_font_size_override("font_size", 11)
+		evo_meter.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25, 1.0))
+		meter_hbox.add_child(evo_meter)
+	else:
+		var cur_lvl = item.get("lvl", 0)
+		for seg_i in range(5):
+			var seg = Panel.new()
+			seg.custom_minimum_size = Vector2(28, 6)
+			var s_style = StyleBoxFlat.new()
+			s_style.set_corner_radius_all(2)
+			if seg_i < cur_lvl:
+				s_style.bg_color = glow_col
+			elif seg_i == cur_lvl:
+				s_style.bg_color = Color(1.0, 1.0, 1.0, 0.95)
+			else:
+				s_style.bg_color = Color(0.12, 0.18, 0.28, 0.8)
+			seg.add_theme_stylebox_override("panel", s_style)
+			meter_hbox.add_child(seg)
+	vbox.add_child(meter_hbox)
+
+	# 5. Stat Boost Badge (Pill)
+	if item.has("stat_bonus") and str(item.stat_bonus) != "":
+		var pill_panel = PanelContainer.new()
+		pill_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pill_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+		var pill_style = StyleBoxFlat.new()
+		pill_style.bg_color = Color(glow_col.r * 0.15, glow_col.g * 0.15, glow_col.b * 0.15, 0.8)
+		pill_style.border_color = glow_col * 0.85
+		pill_style.set_border_width_all(1)
+		pill_style.set_corner_radius_all(8)
+		pill_panel.add_theme_stylebox_override("panel", pill_style)
+
+		var pill_lbl = Label.new()
+		pill_lbl.text = "  %s  " % item.stat_bonus
+		pill_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		pill_lbl.add_theme_font_size_override("font_size", 11)
+		pill_lbl.add_theme_color_override("font_color", glow_col)
+		pill_panel.add_child(pill_lbl)
+		vbox.add_child(pill_panel)
+
+	# 6. Description
+	var desc = Label.new()
+	desc.text = item.desc
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	desc.add_theme_font_size_override("font_size", 12)
+	desc.add_theme_color_override("font_color", Color(0.85, 0.90, 0.98, 0.88))
+	desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(desc)
+
+	# 7. Dedicated Action Button
+	var btn_action = Button.new()
+	btn_action.custom_minimum_size = Vector2(250, 40)
+	btn_action.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	btn_action.text = "👑 TIẾN HÓA NGAY ▶" if item.rarity == "evo" else "⚡ BÚ NÂNG CẤP NÀY ▶"
+	btn_action.add_theme_font_size_override("font_size", 13)
+
+	var btn_normal = StyleBoxFlat.new()
+	btn_normal.bg_color = Color(0.06, 0.12, 0.22, 0.92)
+	btn_normal.border_color = glow_col
+	btn_normal.set_border_width_all(1)
+	btn_normal.set_corner_radius_all(8)
+	btn_action.add_theme_stylebox_override("normal", btn_normal)
+
+	var btn_hover = StyleBoxFlat.new()
+	btn_hover.bg_color = Color(glow_col.r * 0.35, glow_col.g * 0.35, glow_col.b * 0.35, 1.0)
+	btn_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)
+	btn_hover.set_border_width_all(2)
+	btn_hover.set_corner_radius_all(8)
+	btn_hover.shadow_color = glow_col * 0.5
+	btn_hover.shadow_size = 10
+	btn_action.add_theme_stylebox_override("hover", btn_hover)
+
+	vbox.add_child(btn_action)
+
+	# Event Wiring
+	var up_id = item.id
+	var on_select = func():
+		if sound_mgr and sound_mgr.has_method("play_ui_click"):
+			sound_mgr.play_ui_click()
+		_choose_upgrade(up_id)
+
+	btn_action.pressed.connect(on_select)
+	card.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			on_select.call()
+	)
+
+	card.mouse_entered.connect(func():
+		active_card_targets[card] = Vector2(1.05, 1.05)
+		card.z_index = 10
+		card_style.shadow_size = 24
+		card_style.border_color = Color(1.0, 1.0, 1.0, 1.0)
+		if sound_mgr and sound_mgr.has_method("play_ui_hover"):
+			sound_mgr.play_ui_hover()
+	)
+	card.mouse_exited.connect(func():
+		active_card_targets[card] = Vector2(1.0, 1.0)
+		card.z_index = 0
+		card_style.shadow_size = 16
+		card_style.border_color = glow_col
+	)
+
+	btn_action.mouse_entered.connect(func():
+		active_card_targets[card] = Vector2(1.05, 1.05)
+		card.z_index = 10
+	)
+
+	return card
 
 func _build_available_upgrades() -> Array[Dictionary]:
 	var list: Array[Dictionary] = []
@@ -587,144 +720,182 @@ func _build_available_upgrades() -> Array[Dictionary]:
 		list.append({
 			"id": "railgun_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
 			"title": "⚡ HYPERION TACHYON",
-			"desc": "Bắn chùm laser kép hủy diệt liên tục xé toạc toàn bộ chiến trường!"
+			"desc": "Bắn chùm laser kép hủy diệt liên tục xé toạc toàn bộ chiến trường!",
+			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • LASER KÉP", "is_new": false
 		})
 	if w_lv["flame"] >= 5 and p_lv["thrusters"] >= 1 and not evo["flame"]:
 		list.append({
 			"id": "flame_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
 			"title": "🔥 INFERNAL SUNSTORM",
-			"desc": "Phun bão lửa plasma xoay tròn 360° thiêu rụi mọi quái vật áp sát!"
+			"desc": "Phun bão lửa plasma xoay tròn 360° thiêu rụi mọi quái vật áp sát!",
+			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • BÃO LỬA 360°", "is_new": false
 		})
 	if w_lv["shockwave"] >= 5 and p_lv["amp"] >= 1 and not evo["shockwave"]:
 		list.append({
 			"id": "shockwave_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
 			"title": "💥 SUPERNOVA ZERO",
-			"desc": "Sóng nổ kép hố đen nén quái lại rồi kích nổ kinh thiên động địa!"
+			"desc": "Sóng nổ kép hố đen nén quái lại rồi kích nổ kinh thiên động địa!",
+			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • HỐ ĐEN KÉP", "is_new": false
 		})
 	if w_lv["missile"] >= 5 and p_lv["magnet"] >= 1 and not evo["missile"]:
 		list.append({
 			"id": "missile_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
 			"title": "🚀 APOCALYPSE BARRAGE",
-			"desc": "Phóng loạt 6 tên lửa đạn chùm tầm nhiệt nổ liên hoàn khắp màn hình!"
+			"desc": "Phóng loạt 6 tên lửa đạn chùm tầm nhiệt nổ liên hoàn khắp màn hình!",
+			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • 6 TÊN LỬA TẦM NHIỆT", "is_new": false
 		})
 	if w_lv["blade"] >= 5 and p_lv["nano_armor"] >= 1 and not evo["blade"]:
 		list.append({
 			"id": "blade_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
 			"title": "🌀 OMNI-SCYTHE VORTEX",
-			"desc": "4 lưỡi hái năng lượng khổng lồ bọc kín không gian xung quanh!"
+			"desc": "4 lưỡi hái năng lượng khổng lồ bọc kín không gian xung quanh!",
+			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • 4 LƯỠI HÁI OMNI", "is_new": false
 		})
 	if w_lv.has("tesla") and w_lv["tesla"] >= 5 and p_lv["energy_core"] >= 1 and not evo["tesla"]:
 		list.append({
 			"id": "tesla_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
 			"title": "⚡ MJOLNIR STORMCORE",
-			"desc": "Bão sấm sét cuồng nộ giáng liên hoàn khắp bản đồ xé nát quân thù!"
+			"desc": "Bão sấm sét cuồng nộ giáng liên hoàn khắp bản đồ xé nát quân thù!",
+			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • SẤM SÉT TOÀN BẢN ĐỒ", "is_new": false
 		})
 	if w_lv.has("mortar") and w_lv["mortar"] >= 5 and p_lv["amp"] >= 1 and not evo["mortar"]:
 		list.append({
 			"id": "mortar_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
 			"title": "☣️ CORROSIVE CHERNOBYL",
-			"desc": "Bắn 4 pháo cối phóng xạ tạo biển axít hủy diệt làm tan chảy mọi quái vật!"
+			"desc": "Bắn 4 pháo cối phóng xạ tạo biển axít hủy diệt làm tan chảy mọi quái vật!",
+			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • 4 PHÁO CỐI BIỂN AXÍT", "is_new": false
 		})
 
 	# 2. Weapons Unlocks & Upgrades
 	if w_lv["railgun"] < 5 and not evo["railgun"]:
+		var r_lvl = w_lv["railgun"]
 		list.append({
-			"id": "railgun", "rarity": "weapon", "stars": _get_stars(w_lv["railgun"]),
-			"title": "⚡ CƯỜNG HÓA RAILGUN", "desc": "Tăng độ rộng chùm laser, độ dài và sát thương xuyên thấu."
+			"id": "railgun", "rarity": "weapon", "stars": _get_stars(r_lvl),
+			"title": "⚡ CƯỜNG HÓA RAILGUN", "desc": "Tăng độ rộng chùm laser, độ dài và sát thương xuyên thấu.",
+			"lvl": r_lvl, "stat_bonus": "+30% SÁT THƯƠNG & TIA RỘNG", "is_new": false
 		})
+
 	if w_lv["flame"] == 0:
 		list.append({
 			"id": "flame", "rarity": "weapon", "stars": "✨ VŨ KHÍ MỚI",
-			"title": "🔥 SÚNG PHUN LỬA", "desc": "Mở khóa luồng lửa plasma thiêu đốt quái vật phía trước mặt."
+			"title": "🔥 SÚNG PHUN LỬA", "desc": "Mở khóa luồng lửa plasma thiêu đốt quái vật phía trước mặt.",
+			"lvl": 0, "stat_bonus": "MỞ KHÓA VŨ KHÍ MỚI", "is_new": true
 		})
 	elif w_lv["flame"] < 5 and not evo["flame"]:
+		var f_lvl = w_lv["flame"]
 		list.append({
-			"id": "flame", "rarity": "weapon", "stars": _get_stars(w_lv["flame"]),
-			"title": "🔥 NÂNG CẤP LỬA PLASMA", "desc": "Mở rộng góc phun, tăng tầm xa và sát thương thiêu đốt."
+			"id": "flame", "rarity": "weapon", "stars": _get_stars(f_lvl),
+			"title": "🔥 NÂNG CẤP LỬA PLASMA", "desc": "Mở rộng góc phun, tăng tầm xa và sát thương thiêu đốt.",
+			"lvl": f_lvl, "stat_bonus": "+25% GÓC & TẦM PHUN", "is_new": false
 		})
 
 	if w_lv["shockwave"] == 0:
 		list.append({
 			"id": "shockwave", "rarity": "weapon", "stars": "✨ VŨ KHÍ MỚI",
-			"title": "💥 SÓNG CHẤN ĐỘNG NOVA", "desc": "Mở khóa vòng sóng xung kích hất tung toàn bộ quái vật áp sát."
+			"title": "💥 SÓNG CHẤN ĐỘNG NOVA", "desc": "Mở khóa vòng sóng xung kích hất tung toàn bộ quái vật áp sát.",
+			"lvl": 0, "stat_bonus": "MỞ KHÓA VŨ KHÍ MỚI", "is_new": true
 		})
 	elif w_lv["shockwave"] < 5 and not evo["shockwave"]:
+		var s_lvl = w_lv["shockwave"]
 		list.append({
-			"id": "shockwave", "rarity": "weapon", "stars": _get_stars(w_lv["shockwave"]),
-			"title": "💥 NÂNG CẤP SHOCKWAVE", "desc": "Tăng bán kính nổ, lực đẩy lùi và giảm thời gian nạp chiêu."
+			"id": "shockwave", "rarity": "weapon", "stars": _get_stars(s_lvl),
+			"title": "💥 NÂNG CẤP SHOCKWAVE", "desc": "Tăng bán kính nổ, lực đẩy lùi và giảm thời gian nạp chiêu.",
+			"lvl": s_lvl, "stat_bonus": "+35% BÁN KÍNH SÓNG NỔ", "is_new": false
 		})
 
 	if w_lv["missile"] == 0:
 		list.append({
 			"id": "missile", "rarity": "weapon", "stars": "✨ VŨ KHÍ MỚI",
-			"title": "🚀 TÊN LỬA TỰ DẪN", "desc": "Mở khóa bệ phóng tên lửa tầm nhiệt bắn đạn chùm nổ diện rộng."
+			"title": "🚀 TÊN LỬA TỰ DẪN", "desc": "Mở khóa bệ phóng tên lửa tầm nhiệt bắn đạn chùm nổ diện rộng.",
+			"lvl": 0, "stat_bonus": "MỞ KHÓA VŨ KHÍ MỚI", "is_new": true
 		})
 	elif w_lv["missile"] < 5 and not evo["missile"]:
+		var m_lvl = w_lv["missile"]
 		list.append({
-			"id": "missile", "rarity": "weapon", "stars": _get_stars(w_lv["missile"]),
-			"title": "🚀 NÂNG CẤP TÊN LỬA", "desc": "Bắn thêm tên lửa mỗi loạt, tăng bán kính nổ và giảm hồi chiêu."
+			"id": "missile", "rarity": "weapon", "stars": _get_stars(m_lvl),
+			"title": "🚀 NÂNG CẤP TÊN LỬA", "desc": "Bắn thêm tên lửa mỗi loạt, tăng bán kính nổ và giảm hồi chiêu.",
+			"lvl": m_lvl, "stat_bonus": "+2 TÊN LỬA TẦM NHIỆT / LOẠT", "is_new": false
 		})
 
 	if w_lv["blade"] == 0:
 		list.append({
 			"id": "blade", "rarity": "weapon", "stars": "✨ VŨ KHÍ MỚI",
-			"title": "🌀 LƯỠI HÁI QUỸ ĐẠO", "desc": "Mở khóa lưỡi dao năng lượng xoay quanh người bảo vệ cận chiến."
+			"title": "🌀 LƯỠI HÁI QUỸ ĐẠO", "desc": "Mở khóa lưỡi dao năng lượng xoay quanh người bảo vệ cận chiến.",
+			"lvl": 0, "stat_bonus": "MỞ KHÓA VŨ KHÍ MỚI", "is_new": true
 		})
 	elif w_lv["blade"] < 5 and not evo["blade"]:
+		var b_lvl = w_lv["blade"]
 		list.append({
-			"id": "blade", "rarity": "weapon", "stars": _get_stars(w_lv["blade"]),
-			"title": "🌀 NÂNG CẤP LƯỠI HÁI", "desc": "Tăng số lượng lưỡi dao, tốc độ xoay và bán kính quỹ đạo."
+			"id": "blade", "rarity": "weapon", "stars": _get_stars(b_lvl),
+			"title": "🌀 NÂNG CẤP LƯỠI HÁI", "desc": "Tăng số lượng lưỡi dao, tốc độ xoay và bán kính quỹ đạo.",
+			"lvl": b_lvl, "stat_bonus": "+1 LƯỠI HÁI QUỸ ĐẠO", "is_new": false
 		})
 
 	if w_lv.has("tesla"):
 		if w_lv["tesla"] == 0:
 			list.append({
 				"id": "tesla", "rarity": "weapon", "stars": "✨ VŨ KHÍ MỚI",
-				"title": "⚡ CUỘN DÂY TESLA", "desc": "Mở khóa phóng tia điện giật lan truyền qua nhiều kẻ địch liên tiếp."
+				"title": "⚡ CUỘN DÂY TESLA", "desc": "Mở khóa phóng tia điện giật lan truyền qua nhiều kẻ địch liên tiếp.",
+				"lvl": 0, "stat_bonus": "MỞ KHÓA VŨ KHÍ MỚI", "is_new": true
 			})
 		elif w_lv["tesla"] < 5 and not evo["tesla"]:
+			var t_lvl = w_lv["tesla"]
 			list.append({
-				"id": "tesla", "rarity": "weapon", "stars": _get_stars(w_lv["tesla"]),
-				"title": "⚡ NÂNG CẤP TESLA", "desc": "Tăng số lần giật lan, sát thương điện và giảm thời gian nạp."
+				"id": "tesla", "rarity": "weapon", "stars": _get_stars(t_lvl),
+				"title": "⚡ NÂNG CẤP TESLA", "desc": "Tăng số lần giật lan, sát thương điện và giảm thời gian nạp.",
+				"lvl": t_lvl, "stat_bonus": "+2 TIA SÉT LAN TRUYỀN", "is_new": false
 			})
 
 	if w_lv.has("mortar"):
 		if w_lv["mortar"] == 0:
 			list.append({
 				"id": "mortar", "rarity": "weapon", "stars": "✨ VŨ KHÍ MỚI",
-				"title": "☣️ PHÁO CỐI AXÍT", "desc": "Mở khóa bắn đạn axít vòng cung tạo vũng độc ăn mòn diện rộng."
+				"title": "☣️ PHÁO CỐI AXÍT", "desc": "Mở khóa bắn đạn axít vòng cung tạo vũng độc ăn mòn diện rộng.",
+				"lvl": 0, "stat_bonus": "MỞ KHÓA VŨ KHÍ MỚI", "is_new": true
 			})
 		elif w_lv["mortar"] < 5 and not evo["mortar"]:
+			var mo_lvl = w_lv["mortar"]
 			list.append({
-				"id": "mortar", "rarity": "weapon", "stars": _get_stars(w_lv["mortar"]),
-				"title": "☣️ NÂNG CẤP PHÁO CỐI", "desc": "Bắn thêm đạn cối, tăng bán kính và sát thương vũng axít."
+				"id": "mortar", "rarity": "weapon", "stars": _get_stars(mo_lvl),
+				"title": "☣️ NÂNG CẤP PHÁO CỐI", "desc": "Bắn thêm đạn cối, tăng bán kính và sát thương vũng axít.",
+				"lvl": mo_lvl, "stat_bonus": "+1 ĐẠN PHÁO CỐI AXÍT", "is_new": false
 			})
 
 	# 3. Passive Items
 	if p_lv["energy_core"] < 5:
+		var ec_lvl = p_lv["energy_core"]
 		list.append({
-			"id": "energy_core", "rarity": "passive", "stars": _get_stars(p_lv["energy_core"]),
-			"title": "⚡ PIN NĂNG LƯỢNG", "desc": "Giảm 12% thời gian hồi chiêu mọi vũ khí (Tiến hóa Railgun & Tesla)."
+			"id": "energy_core", "rarity": "passive", "stars": _get_stars(ec_lvl),
+			"title": "⚡ PIN NĂNG LƯỢNG", "desc": "Giảm 12% thời gian hồi chiêu mọi vũ khí (Tiến hóa Railgun & Tesla).",
+			"lvl": ec_lvl, "stat_bonus": "-12% HỒI CHIÊU TOÀN DIỆN", "is_new": ec_lvl == 0
 		})
 	if p_lv["nano_armor"] < 5:
+		var na_lvl = p_lv["nano_armor"]
 		list.append({
-			"id": "nano_armor", "rarity": "passive", "stars": _get_stars(p_lv["nano_armor"]),
-			"title": "🩸 GIÁP HỢP KIM", "desc": "+30 Máu tối đa và hồi phục 1.5 HP/giây (Tiến hóa Lưỡi Hái)."
+			"id": "nano_armor", "rarity": "passive", "stars": _get_stars(na_lvl),
+			"title": "🩸 GIÁP HỢP KIM", "desc": "+30 Máu tối đa và hồi phục 1.5 HP/giây (Tiến hóa Lưỡi Hái).",
+			"lvl": na_lvl, "stat_bonus": "+30 HP & +1.5 HP/GIÂY", "is_new": na_lvl == 0
 		})
 	if p_lv["thrusters"] < 5:
+		var th_lvl = p_lv["thrusters"]
 		list.append({
-			"id": "thrusters", "rarity": "passive", "stars": _get_stars(p_lv["thrusters"]),
-			"title": "👟 BỘ ĐẨY PHẢN LỰC", "desc": "+35 Tốc độ di chuyển để luồn lách né quái (Tiến hóa Phun Lửa)."
+			"id": "thrusters", "rarity": "passive", "stars": _get_stars(th_lvl),
+			"title": "👟 BỘ ĐẨY PHẢN LỰC", "desc": "+35 Tốc độ di chuyển để luồn lách né quái (Tiến hóa Phun Lửa).",
+			"lvl": th_lvl, "stat_bonus": "+35 TỐC ĐỘ DI CHUYỂN", "is_new": th_lvl == 0
 		})
 	if p_lv["magnet"] < 5:
+		var mg_lvl = p_lv["magnet"]
 		list.append({
-			"id": "magnet", "rarity": "passive", "stars": _get_stars(p_lv["magnet"]),
-			"title": "🧲 BỘ HÚT TINH THỂ", "desc": "+65 Bán kính hút ngọc kinh nghiệm từ xa (Tiến hóa Tên Lửa)."
+			"id": "magnet", "rarity": "passive", "stars": _get_stars(mg_lvl),
+			"title": "🧲 BỘ HÚT TINH THỂ", "desc": "+65 Bán kính hút ngọc kinh nghiệm từ xa (Tiến hóa Tên Lửa).",
+			"lvl": mg_lvl, "stat_bonus": "+65 BÁN KÍNH HÚT TINH THỂ", "is_new": mg_lvl == 0
 		})
 	if p_lv["amp"] < 5:
+		var ap_lvl = p_lv["amp"]
 		list.append({
-			"id": "amp", "rarity": "passive", "stars": _get_stars(p_lv["amp"]),
-			"title": "💥 CHÍP KHUẾCH ĐẠI", "desc": "+20% Sát thương toàn bộ kho vũ khí (Tiến hóa Shockwave & Pháo Cối)."
+			"id": "amp", "rarity": "passive", "stars": _get_stars(ap_lvl),
+			"title": "💥 CHÍP KHUẾCH ĐẠI", "desc": "+20% Sát thương toàn bộ kho vũ khí (Tiến hóa Shockwave & Pháo Cối).",
+			"lvl": ap_lvl, "stat_bonus": "+20% TỔNG SÁT THƯƠNG", "is_new": ap_lvl == 0
 		})
 
 	return list
@@ -737,6 +908,8 @@ func _get_stars(lvl: int) -> String:
 
 func _choose_upgrade(upgrade_id: String) -> void:
 	level_up_panel.hide()
+	if level_up_dimming:
+		level_up_dimming.hide()
 	get_tree().paused = false
 	upgrade_selected.emit(upgrade_id)
 	call_deferred("update_inventory")
