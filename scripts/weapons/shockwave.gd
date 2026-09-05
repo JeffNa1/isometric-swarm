@@ -1,5 +1,7 @@
 extends Node2D
 
+const LightHelper = preload("res://scripts/light_helper.gd")
+
 @export var damage: float = 80.0
 @export var cooldown: float = 2.2
 @export var blast_radius: float = 220.0

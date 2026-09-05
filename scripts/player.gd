@@ -1,5 +1,7 @@
 extends CharacterBody2D
 
+const LightHelper = preload("res://scripts/light_helper.gd")
+
 signal health_changed(current: float, maximum: float)
 signal xp_changed(current: int, target: int, lvl: int)
 signal leveled_up(new_level: int)

@@ -1,5 +1,7 @@
 extends Node2D
 
+const LightHelper = preload("res://scripts/light_helper.gd")
+
 @export var damage_per_tick: float = 8.0
 @export var tick_interval: float = 0.08
 @export var flame_range: float = 240.0
