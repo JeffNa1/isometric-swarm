@@ -4,6 +4,7 @@ const PylonScene = preload("res://scenes/pylon.tscn")
 const GemScene = preload("res://scenes/gem.tscn")
 const CrateScene = preload("res://scenes/crate.tscn")
 const BossScene = preload("res://scenes/boss.tscn")
+const TreasureChestScene = preload("res://scenes/treasure_chest.tscn")
 
 @onready var arena: Node2D = $Arena
 @onready var swarm_mgr: Node2D = $SwarmManager
@@ -17,6 +18,7 @@ const BossScene = preload("res://scenes/boss.tscn")
 var total_kills: int = 0
 var elapsed_time: float = 0.0
 var spawn_timer: float = 0.0
+var supply_drop_timer: float = 0.0
 
 # Scripted Wave Director Flags
 var surge_triggered: bool = false
@@ -61,18 +63,21 @@ func _spawn_pylons() -> void:
 func _spawn_crates() -> void:
 	if not entities_container:
 		return
-	var count = 65
-	for i in range(count):
+
+	# 1. Starting Sector Crates (14 crates immediately visible around player)
+	for i in range(14):
 		var crate = CrateScene.instantiate()
-		var c_pos = Vector2.ZERO
-		while true:
-			c_pos = Vector2(
-				randf_range(-4400.0, 4400.0),
-				randf_range(-4400.0, 4400.0)
-			)
-			if c_pos.length() > 250.0:
-				break
-		crate.position = c_pos
+		var angle = randf() * TAU
+		var dist = randf_range(160.0, 600.0)
+		crate.position = Vector2(cos(angle) * dist, sin(angle) * dist * 0.65)
+		entities_container.add_child(crate)
+
+	# 2. Arena Exploration Crates (85 crates across active radius)
+	for i in range(85):
+		var crate = CrateScene.instantiate()
+		var angle = randf() * TAU
+		var dist = randf_range(650.0, 3600.0)
+		crate.position = Vector2(cos(angle) * dist, sin(angle) * dist * 0.7)
 		entities_container.add_child(crate)
 
 func vacuum_all_gems() -> void:
@@ -129,12 +134,29 @@ func _process(delta: float) -> void:
 			if hud and hud.has_method("update_combo"):
 				hud.update_combo(0)
 
+	# Periodic supply crate airdrop
+	supply_drop_timer += delta
+	if supply_drop_timer >= 45.0:
+		supply_drop_timer = 0.0
+		_drop_supply_crate()
+
 	# Camera follows player smoothly
 	if is_instance_valid(player):
 		camera.global_position = camera.global_position.lerp(player.global_position, 8.0 * delta)
 
 	# --- SCRIPTED SPAWN DIRECTOR (High Density Swarm Survivor Pacing) ---
 	_process_spawn_director(delta)
+
+func _drop_supply_crate() -> void:
+	if not entities_container or not is_instance_valid(player):
+		return
+	var crate = CrateScene.instantiate()
+	var angle = randf() * TAU
+	var offset = Vector2(cos(angle) * 350.0, sin(angle) * 220.0)
+	crate.position = player.global_position + offset
+	entities_container.add_child(crate)
+	if hud and hud.has_method("show_surge_warning"):
+		hud.show_surge_warning("📦 THÙNG TIẾP TẾ CHIẾN THUẬT ĐÃ ĐÁP XUỐNG! 📦")
 
 func _process_spawn_director(delta: float) -> void:
 	spawn_timer += delta
@@ -324,6 +346,12 @@ func _on_enemy_killed(xp_val: int, pos: Vector2, is_boss: bool) -> void:
 				active_gems.append(gem)
 				gem.tree_exited.connect(func(): active_gems.erase(gem))
 				entities_container.call_deferred("add_child", gem)
+
+	# 3. Mini-Boss (Titan Behemoth) 50% Golden Treasure Chest Drop
+	if is_boss and randf() < 0.50:
+		var chest = TreasureChestScene.instantiate()
+		chest.global_position = pos
+		entities_container.call_deferred("add_child", chest)
 
 func _trigger_combo_announcement(streak: int) -> void:
 	var title = "🔥 %d COMBO!" % streak

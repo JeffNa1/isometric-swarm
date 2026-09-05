@@ -16,6 +16,8 @@ var camera_node: Camera2D = null
 var swarm_mgr: Node2D = null
 
 func _ready() -> void:
+	z_as_relative = false
+	z_index = 4 # Render strictly above swarm (z=3)
 	pickup_tex = SpriteFactory.create_pickup_texture(pickup_type)
 	_get_managers()
 	queue_redraw()

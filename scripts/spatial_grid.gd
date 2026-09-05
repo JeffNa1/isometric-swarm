@@ -13,6 +13,13 @@ var entity_next: PackedInt32Array = PackedInt32Array()
 var entity_cell_x: PackedInt32Array = PackedInt32Array()
 var entity_cell_y: PackedInt32Array = PackedInt32Array()
 
+# Active hash tracking for O(occupied) clear instead of O(TABLE_SIZE)
+var occupied_hashes: PackedInt32Array = PackedInt32Array()
+var occupied_count: int = 0
+
+# Persistent query buffer to eliminate heap allocations
+var query_buffer: Array[int] = []
+
 func _init(p_cell_size: float = 90.0, initial_capacity: int = 6000) -> void:
 	cell_size = p_cell_size
 	inv_cell_size = 1.0 / p_cell_size
@@ -20,6 +27,7 @@ func _init(p_cell_size: float = 90.0, initial_capacity: int = 6000) -> void:
 	cell_head.resize(TABLE_SIZE)
 	cell_head.fill(-1)
 
+	occupied_hashes.resize(2048)
 	_ensure_capacity(initial_capacity)
 
 func _ensure_capacity(capacity: int) -> void:
@@ -33,7 +41,9 @@ func _ensure_capacity(capacity: int) -> void:
 			entity_next[i] = -1
 
 func clear() -> void:
-	cell_head.fill(-1)
+	for i in range(occupied_count):
+		cell_head[occupied_hashes[i]] = -1
+	occupied_count = 0
 
 func insert(index: int, pos: Vector2) -> void:
 	if index >= entity_next.size():
@@ -43,13 +53,19 @@ func insert(index: int, pos: Vector2) -> void:
 	var cy: int = int(floor(pos.y * inv_cell_size))
 	var h: int = ((cx * 73856093) ^ (cy * 19349663)) & TABLE_MASK
 
+	if cell_head[h] == -1:
+		if occupied_count >= occupied_hashes.size():
+			occupied_hashes.resize(occupied_hashes.size() * 2)
+		occupied_hashes[occupied_count] = h
+		occupied_count += 1
+
 	entity_cell_x[index] = cx
 	entity_cell_y[index] = cy
 	entity_next[index] = cell_head[h]
 	cell_head[h] = index
 
 func get_nearby(pos: Vector2, search_radius: float) -> Array[int]:
-	var result: Array[int] = []
+	query_buffer.clear()
 	var min_cx: int = int(floor((pos.x - search_radius) * inv_cell_size))
 	var max_cx: int = int(floor((pos.x + search_radius) * inv_cell_size))
 	var min_cy: int = int(floor((pos.y - search_radius) * inv_cell_size))
@@ -61,17 +77,43 @@ func get_nearby(pos: Vector2, search_radius: float) -> Array[int]:
 			var curr: int = cell_head[h]
 			while curr != -1:
 				if entity_cell_x[curr] == cx and entity_cell_y[curr] == cy:
-					result.append(curr)
+					query_buffer.append(curr)
 				curr = entity_next[curr]
-	return result
+	return query_buffer
 
 const ADJ_DX: PackedInt32Array = [0, -1, 0, 1, -1, 1, -1, 0, 1]
 const ADJ_DY: PackedInt32Array = [0, -1, -1, -1, 0, 0, 1, 1, 1]
 
+# Direct zero-allocation separation force calculation
+func calculate_separation(pos: Vector2, rad_i: float, my_idx: int, positions: PackedVector2Array, radii: PackedFloat32Array, active_count: int, max_neighbors: int = 5) -> Vector2:
+	var cx: int = int(floor(pos.x * inv_cell_size))
+	var cy: int = int(floor(pos.y * inv_cell_size))
+	var sep = Vector2.ZERO
+	var found = 0
+
+	for n in 9:
+		var ncx: int = cx + ADJ_DX[n]
+		var ncy: int = cy + ADJ_DY[n]
+		var h: int = ((ncx * 73856093) ^ (ncy * 19349663)) & TABLE_MASK
+		var curr: int = cell_head[h]
+		while curr != -1:
+			if curr != my_idx and curr < active_count and entity_cell_x[curr] == ncx and entity_cell_y[curr] == ncy:
+				var diff = pos - positions[curr]
+				var d_sq = diff.length_squared()
+				var min_d = rad_i + radii[curr]
+				if d_sq < min_d * min_d and d_sq > 0.01:
+					var d = sqrt(d_sq)
+					sep += (diff / d) * (min_d - d) * 14.0
+					found += 1
+					if found >= max_neighbors:
+						return sep
+			curr = entity_next[curr]
+	return sep
+
 func get_in_cell_and_adjacent(pos: Vector2) -> Array[int]:
+	query_buffer.clear()
 	var cx: int = int(floor(pos.x * inv_cell_size))
 	var cy: int = int(floor(pos.y * inv_cell_size))
-	var result: Array[int] = []
 
 	for n in 9:
 		var ncx: int = cx + ADJ_DX[n]
@@ -80,24 +122,6 @@ func get_in_cell_and_adjacent(pos: Vector2) -> Array[int]:
 		var curr: int = cell_head[h]
 		while curr != -1:
 			if entity_cell_x[curr] == ncx and entity_cell_y[curr] == ncy:
-				result.append(curr)
+				query_buffer.append(curr)
 			curr = entity_next[curr]
-	return result
-
-func get_neighbors_capped(pos: Vector2, max_count: int = 6) -> Array[int]:
-	var cx: int = int(floor(pos.x * inv_cell_size))
-	var cy: int = int(floor(pos.y * inv_cell_size))
-	var result: Array[int] = []
-
-	for n in 9:
-		var ncx: int = cx + ADJ_DX[n]
-		var ncy: int = cy + ADJ_DY[n]
-		var h: int = ((ncx * 73856093) ^ (ncy * 19349663)) & TABLE_MASK
-		var curr: int = cell_head[h]
-		while curr != -1:
-			if entity_cell_x[curr] == ncx and entity_cell_y[curr] == ncy:
-				result.append(curr)
-				if result.size() >= max_count:
-					return result
-			curr = entity_next[curr]
-	return result
+	return query_buffer

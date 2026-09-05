@@ -62,15 +62,16 @@ func _attempt_fire() -> void:
 		return
 
 	var origin = global_position
-	var sample_limit = min(swarm_mgr.active_count, 80)
+	var candidates = swarm_mgr.spatial_grid.get_nearby(origin, attack_range)
 	var first_idx: int = -1
 	var best_dist: float = attack_range
 
-	for i in range(sample_limit):
-		var d = origin.distance_to(swarm_mgr.positions[i])
-		if d < best_dist:
-			best_dist = d
-			first_idx = i
+	for idx in candidates:
+		if idx < swarm_mgr.active_count:
+			var d = origin.distance_to(swarm_mgr.positions[idx])
+			if d < best_dist:
+				best_dist = d
+				first_idx = idx
 
 	if first_idx == -1:
 		return
@@ -83,12 +84,12 @@ func _attempt_fire() -> void:
 	if is_evolved and swarm_mgr.active_count > 1:
 		var second_idx = -1
 		var second_dist = attack_range
-		for i in range(sample_limit):
-			if i != first_idx:
-				var d = origin.distance_to(swarm_mgr.positions[i])
+		for idx in candidates:
+			if idx != first_idx and idx < swarm_mgr.active_count:
+				var d = origin.distance_to(swarm_mgr.positions[idx])
 				if d < second_dist:
 					second_dist = d
-					second_idx = i
+					second_idx = idx
 		if second_idx != -1:
 			_fire_chain(second_idx)
 

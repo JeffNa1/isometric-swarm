@@ -34,15 +34,18 @@ func _attempt_fire() -> void:
 		return
 
 	var origin_pos = global_position
-	# Find candidate targets in swarm
+	# Find candidate targets using O(1) spatial grid
+	var candidates = swarm_mgr.spatial_grid.get_nearby(origin_pos, attack_range)
 	var targets: Array[Vector2] = []
-	var sample_count = min(swarm_mgr.active_count, 60)
 
-	for i in range(sample_count):
-		var p = swarm_mgr.positions[i]
-		var dist = origin_pos.distance_to(p)
-		if dist <= attack_range and dist > 40.0:
-			targets.append(p)
+	for idx in candidates:
+		if idx < swarm_mgr.active_count:
+			var p = swarm_mgr.positions[idx]
+			var dist = origin_pos.distance_to(p)
+			if dist <= attack_range and dist > 30.0:
+				targets.append(p)
+				if targets.size() >= missiles_per_volley:
+					break
 
 	if targets.is_empty():
 		return

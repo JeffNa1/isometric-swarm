@@ -3,6 +3,7 @@ extends StaticBody2D
 const SpriteFactory = preload("res://scripts/sprite_factory.gd")
 const FIELD_PICKUP_SCENE = preload("res://scenes/field_pickup.tscn")
 const GEM_SCENE = preload("res://scenes/gem.tscn")
+const TREASURE_CHEST_SCENE = preload("res://scenes/treasure_chest.tscn")
 
 @export var max_health: float = 35.0
 var current_health: float = 35.0
@@ -15,6 +16,8 @@ var particle_mgr: Node2D = null
 var player_ref: Node2D = null
 
 func _ready() -> void:
+	z_as_relative = false
+	z_index = 4 # Render strictly above swarm (z=3)
 	if not crate_tex:
 		crate_tex = SpriteFactory.create_crate_texture()
 	current_health = max_health
@@ -65,20 +68,27 @@ func _break_crate() -> void:
 	if not entities:
 		entities = get_parent()
 
-	# 70% chance to drop powerup, 30% chance for gem cluster
-	if randf() < 0.7:
+	var roll = randf()
+	# 8% jackpot chance to drop a golden treasure chest!
+	if roll < 0.08:
+		var chest = TREASURE_CHEST_SCENE.instantiate()
+		chest.global_position = global_position
+		entities.call_deferred("add_child", chest)
+	# 65% chance to drop field powerup
+	elif roll < 0.73:
 		var pickup = FIELD_PICKUP_SCENE.instantiate()
-		var roll = randf()
+		var p_roll = randf()
 		var p_type = "gold"
-		if roll < 0.15: p_type = "nuke"
-		elif roll < 0.38: p_type = "vacuum"
-		elif roll < 0.58: p_type = "medkit"
-		elif roll < 0.78: p_type = "overclock"
+		if p_roll < 0.15: p_type = "nuke"
+		elif p_roll < 0.38: p_type = "vacuum"
+		elif p_roll < 0.58: p_type = "medkit"
+		elif p_roll < 0.78: p_type = "overclock"
 		else: p_type = "gold"
 
 		pickup.setup(p_type)
 		pickup.global_position = global_position
 		entities.call_deferred("add_child", pickup)
+	# 27% chance for gem cluster
 	else:
 		for g in range(3):
 			var gem = GEM_SCENE.instantiate()

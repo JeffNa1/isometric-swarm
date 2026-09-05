@@ -12,6 +12,8 @@ var sound_mgr: Node = null
 var hud: CanvasLayer = null
 
 func _ready() -> void:
+	z_as_relative = false
+	z_index = 4 # Render strictly above swarm (z=3)
 	if not chest_tex:
 		chest_tex = SpriteFactory.create_chest_texture()
 	_get_managers()

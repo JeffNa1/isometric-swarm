@@ -192,31 +192,36 @@ func _physics_process(delta: float) -> void:
 	var b_idx = 0
 	var ticks = Time.get_ticks_msec() * 0.001
 	var frame_idx = Engine.get_physics_frames()
+	var p_vel = player_ref.velocity if (is_instance_valid(player_ref) and "velocity" in player_ref) else Vector2.ZERO
+	var p_has_speed = p_vel.length_squared() > 100.0
+	var forward_dir = p_vel.normalized() if p_has_speed else Vector2.RIGHT
 
 	for i in range(active_count):
 		var pos = positions[i]
 		var to_player = player_pos - pos
 		var dist_to_player = to_player.length()
 
+		# 1. Vampire Survivors Edge-Teleport Wrap: Never waste CPU on mobs stranded far behind
+		if dist_to_player > 1550.0 and types[i] != 2: # Keep bosses/brutes intact
+			var wrap_angle = (forward_dir.angle() if p_has_speed else randf() * TAU) + randf_range(-1.0, 1.0)
+			pos = player_pos + Vector2(cos(wrap_angle), sin(wrap_angle) * 0.75) * randf_range(880.0, 1180.0)
+			positions[i] = pos
+			velocities[i] = Vector2.ZERO
+			separation_forces[i] = Vector2.ZERO
+			to_player = player_pos - pos
+			dist_to_player = to_player.length()
+
 		var norm_to_player = to_player / max(0.001, dist_to_player)
 		var iso_dir = Vector2(norm_to_player.x, norm_to_player.y * 0.75).normalized()
 
 		var rad_i = radii[i]
 		var sep_force = separation_forces[i]
-		if dist_to_player < 950.0:
+
+		# 2. Tightened Flocking: Only front-line crowding mobs (< 380px) calculate repulsion
+		if dist_to_player < 380.0:
 			if (i + frame_idx) % 2 == 0:
-				var neighbors = spatial_grid.get_neighbors_capped(pos, 5)
-				var new_sep = Vector2.ZERO
-				for n_idx in neighbors:
-					if n_idx != i and n_idx < active_count:
-						var diff = pos - positions[n_idx]
-						var d_sq = diff.length_squared()
-						var min_d = rad_i + radii[n_idx]
-						if d_sq < min_d * min_d and d_sq > 0.01:
-							var d = sqrt(d_sq)
-							new_sep += (diff / d) * (min_d - d) * 14.0
-				separation_forces[i] = new_sep
-				sep_force = new_sep
+				sep_force = spatial_grid.calculate_separation(pos, rad_i, i, positions, radii, active_count, 4)
+				separation_forces[i] = sep_force
 		else:
 			separation_forces[i] = Vector2.ZERO
 			sep_force = Vector2.ZERO
@@ -232,41 +237,32 @@ func _physics_process(delta: float) -> void:
 		if hit_timers[i] > 0.0:
 			hit_timers[i] -= delta
 
-		var is_hit = hit_timers[i] > 0.0
-		var col = COL_HIT if is_hit else COL_WHITE
-		var t_type = types[i]
+		# 3. MultiMesh Frustum Culling: Only pass visible on-screen instances to GPU
+		if dist_to_player <= 1050.0:
+			var is_hit = hit_timers[i] > 0.0
+			var col = COL_HIT if is_hit else COL_WHITE
+			var t_type = types[i]
+			var rot: float = 0.0
 
-		# LOD: Skip sinusoidal wobble calculations when mob is off-camera
-		var is_on_screen = dist_to_player <= 1100.0
-		var rot: float = 0.0
-		if is_on_screen:
 			match t_type:
 				1: # Scout
 					var hover_wiggle = sin(ticks * 24.0 + float(i) * 2.0) * 0.12
 					rot = velocities[i].angle() + PI * 0.5 + hover_wiggle
+					mm_scout.set_instance_transform_2d(s_idx, Transform2D(rot, Vector2.ONE, 0.0, positions[i]))
+					mm_scout.set_instance_color(s_idx, col)
+					s_idx += 1
 				2: # Brute
 					var heavy_tread = sin(ticks * 8.0 + float(i)) * 0.07
 					rot = velocities[i].angle() + PI * 0.5 + heavy_tread
+					mm_brute.set_instance_transform_2d(b_idx, Transform2D(rot, Vector2.ONE, 0.0, positions[i]))
+					mm_brute.set_instance_color(b_idx, col)
+					b_idx += 1
 				_: # Crawler
 					var scuttle = sin(ticks * 16.0 + float(i) * 1.5) * 0.18
 					rot = velocities[i].angle() + PI * 0.5 + scuttle
-		else:
-			rot = 0.0
-
-		var t = Transform2D(rot, Vector2.ONE, 0.0, positions[i])
-		match t_type:
-			1:
-				mm_scout.set_instance_transform_2d(s_idx, t)
-				mm_scout.set_instance_color(s_idx, col)
-				s_idx += 1
-			2:
-				mm_brute.set_instance_transform_2d(b_idx, t)
-				mm_brute.set_instance_color(b_idx, col)
-				b_idx += 1
-			_:
-				mm_crawler.set_instance_transform_2d(c_idx, t)
-				mm_crawler.set_instance_color(c_idx, col)
-				c_idx += 1
+					mm_crawler.set_instance_transform_2d(c_idx, Transform2D(rot, Vector2.ONE, 0.0, positions[i]))
+					mm_crawler.set_instance_color(c_idx, col)
+					c_idx += 1
 
 	mm_crawler.visible_instance_count = c_idx
 	mm_scout.visible_instance_count = s_idx

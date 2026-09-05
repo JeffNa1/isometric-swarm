@@ -19,6 +19,8 @@ static var sound_mgr: Node = null
 static var particle_mgr: Node2D = null
 
 func _ready() -> void:
+	z_as_relative = false
+	z_index = 4 # Render strictly above swarm (z=3)
 	if not gem_tex:
 		gem_tex = SpriteFactory.create_gem_texture()
 	collision_layer = 8

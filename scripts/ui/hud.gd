@@ -23,6 +23,9 @@ signal upgrade_selected(upgrade_id: String)
 @onready var inventory_box: HBoxContainer = $BottomBar/InventoryTray/InventoryBox
 @onready var low_hp_overlay: ColorRect = $LowHPOverlay
 
+const VignetteShader = preload("res://shaders/vignette.gdshader")
+var vignette_mat: ShaderMaterial = null
+
 @onready var radar_rect: Control = $RadarContainer/RadarView
 @onready var level_up_dimming: ColorRect = $LevelUpDimming
 @onready var level_up_panel: PanelContainer = $LevelUpModal
@@ -84,7 +87,13 @@ func _ready() -> void:
 	if boss_container: boss_container.hide()
 	if chest_modal: chest_modal.hide()
 	if pause_modal: pause_modal.hide()
-	if low_hp_overlay: low_hp_overlay.hide()
+	if low_hp_overlay:
+		vignette_mat = ShaderMaterial.new()
+		vignette_mat.shader = VignetteShader
+		vignette_mat.set_shader_parameter("intensity", 0.0)
+		low_hp_overlay.material = vignette_mat
+		low_hp_overlay.color = Color.WHITE
+		low_hp_overlay.show()
 
 	if health_chassis:
 		health_chassis_base_pos = health_chassis.position
@@ -358,16 +367,16 @@ func _process(delta: float) -> void:
 		if ghost_hp_bar:
 			ghost_hp_bar.value = ghost_hp
 
-		# Low HP warning vignette pulse (quantized 4-step retro strobe)
+		# Low HP warning vignette (soft, non-intrusive edge breathing pulse)
 		if max_hp > 0.0 and (target_hp / max_hp) < 0.3:
-			if low_hp_overlay:
-				low_hp_overlay.show()
-				var step = (int(Time.get_ticks_msec() / 120) % 4)
-				var alpha_levels = [0.08, 0.18, 0.28, 0.18]
-				low_hp_overlay.color = Color(0.9, 0.05, 0.05, alpha_levels[step])
+			var hp_ratio = target_hp / max_hp
+			var pulse = (sin(Time.get_ticks_msec() * 0.005) * 0.5 + 0.5)
+			var target_intensity = lerp(0.5, 0.18, hp_ratio / 0.3) * (0.7 + 0.3 * pulse)
+			if vignette_mat:
+				vignette_mat.set_shader_parameter("intensity", target_intensity)
 		else:
-			if low_hp_overlay:
-				low_hp_overlay.hide()
+			if vignette_mat:
+				vignette_mat.set_shader_parameter("intensity", 0.0)
 
 		if boss_container and boss_container.visible:
 			boss_hp_bar.value = round(lerp(float(boss_hp_bar.value), target_boss_hp, 10.0 * delta))
