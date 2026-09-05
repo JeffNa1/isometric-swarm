@@ -1,8 +1,11 @@
 extends Node2D
 
+const PylonScene = preload("res://scenes/pylon.tscn")
+
 @onready var arena: Node2D = $Arena
 @onready var swarm_mgr: Node2D = $SwarmManager
 @onready var player: CharacterBody2D = $Entities/Player
+@onready var pylons_container: Node2D = $Entities/Pylons
 @onready var camera: Camera2D = $Camera2D
 @onready var hud: CanvasLayer = $HUD
 
@@ -14,8 +17,26 @@ var cluster_interval: float = 1.6
 func _ready() -> void:
 	_setup_inputs_if_needed()
 	_connect_signals()
+	_spawn_pylons()
 	# Spawn initial swarm horde immediately (200 units)
 	_spawn_initial_horde()
+
+func _spawn_pylons() -> void:
+	if not pylons_container:
+		return
+	var count = 50
+	for i in range(count):
+		var pylon = PylonScene.instantiate()
+		var p_pos = Vector2.ZERO
+		while true:
+			p_pos = Vector2(
+				randf_range(-4400.0, 4400.0),
+				randf_range(-4400.0, 4400.0)
+			)
+			if p_pos.length() > 380.0:
+				break
+		pylon.position = p_pos
+		pylons_container.add_child(pylon)
 
 func _setup_inputs_if_needed() -> void:
 	var bindings = {

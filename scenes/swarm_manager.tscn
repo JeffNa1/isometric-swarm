@@ -5,4 +5,8 @@
 [node name="SwarmManager" type="Node2D"]
 script = ExtResource("1_swarm")
 
-[node name="MultiMeshInstance2D" type="MultiMeshInstance2D" parent="."]
+[node name="CrawlerMM" type="MultiMeshInstance2D" parent="."]
+
+[node name="ScoutMM" type="MultiMeshInstance2D" parent="."]
+
+[node name="BruteMM" type="MultiMeshInstance2D" parent="."]

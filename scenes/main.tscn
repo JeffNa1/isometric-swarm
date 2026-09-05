@@ -38,6 +38,9 @@ environment = SubResource("Environment_glow")
 [node name="Entities" type="Node2D" parent="."]
 y_sort_enabled = true
 
+[node name="Pylons" type="Node2D" parent="Entities"]
+y_sort_enabled = true
+
 [node name="Player" parent="Entities" instance=ExtResource("7_player")]
 
 [node name="Camera2D" type="Camera2D" parent="."]

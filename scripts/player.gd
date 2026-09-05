@@ -32,11 +32,18 @@ var particle_mgr: Node2D = null
 @onready var flame_weapon: Node2D = $Weapons/Flamethrower
 @onready var shockwave_weapon: Node2D = $Weapons/Shockwave
 
+const SpriteFactory = preload("res://scripts/sprite_factory.gd")
+
+var player_frames: Array[ImageTexture] = []
+var active_frame: int = 0
+
 func _ready() -> void:
 	current_health = max_health
 	move_speed = base_speed
 	health_changed.emit(current_health, max_health)
 	xp_changed.emit(xp, xp_to_next, level)
+
+	player_frames = SpriteFactory.create_player_frames()
 	
 	if aura_light:
 		aura_light.texture = LightHelper.get_radial_texture(128)
@@ -70,17 +77,19 @@ func _physics_process(delta: float) -> void:
 		var input_norm = raw_input.normalized()
 		var iso_dir = Vector2(input_norm.x, input_norm.y * 0.75).normalized()
 		velocity = velocity.move_toward(iso_dir * move_speed, 1800.0 * delta)
-		walk_cycle += delta * 14.0
+		walk_cycle += delta * 12.0
+		active_frame = int(fmod(walk_cycle, 4.0))
 		if input_x != 0.0:
 			facing_right = input_x > 0.0
 			
 		# Thruster jet sparks when sprinting
 		if particle_mgr and randf() < 0.35:
-			var jet_pos = global_position + Vector2(-6 if facing_right else 6, 2)
-			particle_mgr.spawn_sparks(jet_pos, Color(0.2, 0.8, 1.8, 1.0), 2)
+			var jet_pos = global_position + Vector2(-8 if facing_right else 8, 2)
+			particle_mgr.spawn_sparks(jet_pos, Color(0.3, 1.5, 3.0, 1.0), 2)
 	else:
 		velocity = velocity.move_toward(Vector2.ZERO, 2000.0 * delta)
-		walk_cycle = move_toward(walk_cycle, 0.0, delta * 8.0)
+		walk_cycle = 0.0
+		active_frame = 0
 
 	move_and_slide()
 	queue_redraw()
@@ -143,36 +152,19 @@ func apply_upgrade(upgrade_id: String) -> void:
 			heal(80.0)
 
 func _draw() -> void:
-	# Isometric Ground Shadow
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.5))
-	draw_circle(Vector2.ZERO, 18.0, Color(0.0, 0.0, 0.0, 0.5))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if player_frames.is_empty():
+		return
 
-	var bob = sin(walk_cycle) * 2.5
-	var color_body = Color(1.0, 1.0, 1.0, 1.0) if hurt_flash_timer > 0.0 else Color(0.12, 0.45, 0.9, 1.0)
+	var tex = player_frames[clampi(active_frame, 0, player_frames.size() - 1)]
 	var flip = 1.0 if facing_right else -1.0
+	var col = Color(5.0, 5.0, 5.0, 1.0) if hurt_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, 1.0)
 
-	# Heavy Armor Torso
-	var body_pos = Vector2(0.0, -18.0 + bob)
-	var torso_pts = PackedVector2Array([
-		body_pos + Vector2(0, -14),
-		body_pos + Vector2(12 * flip, -5),
-		body_pos + Vector2(8 * flip, 12),
-		body_pos + Vector2(-8 * flip, 12),
-		body_pos + Vector2(-12 * flip, -5)
-	])
-	draw_colored_polygon(torso_pts, color_body)
+	# Transform for horizontal flip
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2(flip, 1.0))
+	draw_texture(tex, Vector2(-24.0, -41.0), col)
 
-	# Shoulder armor
-	draw_circle(body_pos + Vector2(-10 * flip, -8), 6.0, Color(0.08, 0.25, 0.65, 1.0))
-	draw_circle(body_pos + Vector2(10 * flip, -8), 6.0, Color(0.08, 0.25, 0.65, 1.0))
-
-	# HDR Cyber Reactor Core (Glows intensely!)
+	# Dynamic HDR reactor pulse accent
 	var pulse = 0.8 + 0.3 * sin(Time.get_ticks_msec() * 0.008)
-	draw_circle(body_pos + Vector2(2 * flip, 0), 4.5, Color(0.2 * pulse, 1.8 * pulse, 2.5 * pulse, 1.0))
+	draw_circle(Vector2(0, -22), 2.5, Color(0.3 * pulse, 2.5 * pulse, 3.5 * pulse, 0.75))
 
-	# Helmet & Visor
-	var head_pos = body_pos + Vector2(0, -18)
-	draw_circle(head_pos, 8.0, Color(0.9, 0.95, 1.0, 1.0))
-	# HDR Cyan Visor
-	draw_rect(Rect2(head_pos + Vector2(1 * flip, -1), Vector2(7 * flip, 3.5)), Color(0.2, 1.8, 2.4, 1.0))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

@@ -3,9 +3,13 @@ extends Node2D
 const MAX_SWARM: int = 5000
 const SPATIAL_CELL_SIZE: float = 90.0
 
-@onready var multi_mesh_inst: MultiMeshInstance2D = $MultiMeshInstance2D
-
+const SpriteFactory = preload("res://scripts/sprite_factory.gd")
 const SpatialGridClass = preload("res://scripts/spatial_grid.gd")
+
+@onready var crawler_mmi: MultiMeshInstance2D = $CrawlerMM
+@onready var scout_mmi: MultiMeshInstance2D = $ScoutMM
+@onready var brute_mmi: MultiMeshInstance2D = $BruteMM
+
 var spatial_grid = SpatialGridClass.new(SPATIAL_CELL_SIZE)
 
 var active_count: int = 0
@@ -31,7 +35,7 @@ signal enemy_killed(xp_val: int, pos: Vector2)
 signal swarm_count_changed(count: int)
 
 func _ready() -> void:
-	_init_multimesh()
+	_init_multimeshes()
 	_allocate_arrays()
 	_get_managers()
 
@@ -54,58 +58,45 @@ func _allocate_arrays() -> void:
 	speeds.resize(MAX_SWARM)
 	damages.resize(MAX_SWARM)
 
-func _init_multimesh() -> void:
-	var mm = MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_2D
-	mm.use_colors = true
-	mm.instance_count = MAX_SWARM
-	mm.visible_instance_count = 0
+func _init_multimeshes() -> void:
+	# 1. Crimson Chitin Crawler MultiMesh (48x48)
+	var mm_crawler = MultiMesh.new()
+	mm_crawler.transform_format = MultiMesh.TRANSFORM_2D
+	mm_crawler.use_colors = true
+	mm_crawler.instance_count = MAX_SWARM
+	mm_crawler.visible_instance_count = 0
+	var quad_crawler = QuadMesh.new()
+	quad_crawler.size = Vector2(48.0, 48.0)
+	mm_crawler.mesh = quad_crawler
+	crawler_mmi.multimesh = mm_crawler
+	crawler_mmi.texture = SpriteFactory.create_crawler_texture()
+	crawler_mmi.material = CanvasItemMaterial.new()
 
-	var quad = QuadMesh.new()
-	quad.size = Vector2(34.0, 34.0)
-	mm.mesh = quad
+	# 2. Electric Violet Scout MultiMesh (40x40)
+	var mm_scout = MultiMesh.new()
+	mm_scout.transform_format = MultiMesh.TRANSFORM_2D
+	mm_scout.use_colors = true
+	mm_scout.instance_count = MAX_SWARM
+	mm_scout.visible_instance_count = 0
+	var quad_scout = QuadMesh.new()
+	quad_scout.size = Vector2(40.0, 40.0)
+	mm_scout.mesh = quad_scout
+	scout_mmi.multimesh = mm_scout
+	scout_mmi.texture = SpriteFactory.create_scout_texture()
+	scout_mmi.material = CanvasItemMaterial.new()
 
-	# High-fidelity procedural beetle sprite texture with ground shadow & specular chitin
-	var img = Image.create(34, 34, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	
-	# Ground shadow (isometric ellipse)
-	for y in range(24, 32):
-		for x in range(6, 28):
-			var dx = (x - 17.0) / 10.0
-			var dy = (y - 28.0) / 3.5
-			if dx * dx + dy * dy <= 1.0:
-				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.5))
-				
-	# Bug carapace (chitin segments)
-	for y in range(4, 25):
-		for x in range(7, 27):
-			var dx = (x - 17.0) / 8.0
-			var dy = (y - 15.0) / 9.0
-			var r_sq = dx * dx + dy * dy
-			if r_sq <= 1.0:
-				# Specular ridge highlight down center
-				var is_ridge = abs(x - 17) <= 1
-				var col_val = 1.0 if is_ridge else (0.85 if r_sq < 0.65 else 0.5)
-				img.set_pixel(x, y, Color(col_val, col_val, col_val, 1.0))
-
-	# Front mandibles / pincers
-	img.set_pixel(12, 3, Color(0.9, 0.9, 0.9, 1.0))
-	img.set_pixel(13, 2, Color(0.9, 0.9, 0.9, 1.0))
-	img.set_pixel(21, 2, Color(0.9, 0.9, 0.9, 1.0))
-	img.set_pixel(22, 3, Color(0.9, 0.9, 0.9, 1.0))
-				
-	# Glowing menacing eyes
-	img.set_pixel(13, 6, Color(1.5, 0.1, 0.1, 1.0)) # HDR Red eye
-	img.set_pixel(14, 6, Color(2.0, 1.5, 0.2, 1.0))
-	img.set_pixel(19, 6, Color(2.0, 1.5, 0.2, 1.0))
-	img.set_pixel(20, 6, Color(1.5, 0.1, 0.1, 1.0))
-
-	var tex = ImageTexture.create_from_image(img)
-	var mat = CanvasItemMaterial.new()
-	multi_mesh_inst.texture = tex
-	multi_mesh_inst.material = mat
-	multi_mesh_inst.multimesh = mm
+	# 3. Volcanic Magma Behemoth MultiMesh (72x72)
+	var mm_brute = MultiMesh.new()
+	mm_brute.transform_format = MultiMesh.TRANSFORM_2D
+	mm_brute.use_colors = true
+	mm_brute.instance_count = MAX_SWARM
+	mm_brute.visible_instance_count = 0
+	var quad_brute = QuadMesh.new()
+	quad_brute.size = Vector2(72.0, 72.0)
+	mm_brute.mesh = quad_brute
+	brute_mmi.multimesh = mm_brute
+	brute_mmi.texture = SpriteFactory.create_brute_texture()
+	brute_mmi.material = CanvasItemMaterial.new()
 
 func spawn_enemy(spawn_pos: Vector2, enemy_type: int) -> bool:
 	if active_count >= MAX_SWARM:
@@ -118,40 +109,42 @@ func spawn_enemy(spawn_pos: Vector2, enemy_type: int) -> bool:
 	types[idx] = enemy_type
 
 	match enemy_type:
-		1: # Scout (Fast, Agile, Purple)
+		1: # Scout (Fast, Agile, Purple Wasp)
 			max_healths[idx] = 25.0
 			healths[idx] = 25.0
 			speeds[idx] = 195.0
-			radii[idx] = 10.0
+			radii[idx] = 12.0
 			damages[idx] = 8.0
-		2: # Brute (Huge, High HP, Heavy)
-			max_healths[idx] = 160.0
-			healths[idx] = 160.0
-			speeds[idx] = 80.0
-			radii[idx] = 19.0
-			damages[idx] = 28.0
-		_: # 0: Crawler (Swarm backbone, Red)
+		2: # Brute (Huge, High HP, Volcanic Behemoth)
+			max_healths[idx] = 175.0
+			healths[idx] = 175.0
+			speeds[idx] = 78.0
+			radii[idx] = 25.0
+			damages[idx] = 30.0
+		_: # 0: Crawler (Swarm backbone, Crimson Beetle)
 			max_healths[idx] = 40.0
 			healths[idx] = 40.0
 			speeds[idx] = 130.0
-			radii[idx] = 12.0
+			radii[idx] = 15.0
 			damages[idx] = 12.0
 
 	active_count += 1
-	multi_mesh_inst.multimesh.visible_instance_count = active_count
 	swarm_count_changed.emit(active_count)
 	return true
 
 func spawn_cluster(center: Vector2, count: int, enemy_type: int = 0) -> void:
 	for i in range(count):
 		var offset = Vector2(
-			randf_range(-120.0, 120.0),
-			randf_range(-70.0, 70.0)
+			randf_range(-130.0, 130.0),
+			randf_range(-75.0, 75.0)
 		)
 		spawn_enemy(center + offset, enemy_type)
 
 func _physics_process(delta: float) -> void:
 	if active_count == 0:
+		crawler_mmi.multimesh.visible_instance_count = 0
+		scout_mmi.multimesh.visible_instance_count = 0
+		brute_mmi.multimesh.visible_instance_count = 0
 		return
 
 	if not player_ref:
@@ -162,7 +155,14 @@ func _physics_process(delta: float) -> void:
 		spatial_grid.insert(i, positions[i])
 
 	var player_pos = player_ref.global_position if is_instance_valid(player_ref) else Vector2.ZERO
-	var mm = multi_mesh_inst.multimesh
+	var mm_crawler = crawler_mmi.multimesh
+	var mm_scout = scout_mmi.multimesh
+	var mm_brute = brute_mmi.multimesh
+
+	var c_idx = 0
+	var s_idx = 0
+	var b_idx = 0
+	var ticks = Time.get_ticks_msec() * 0.001
 
 	for i in range(active_count):
 		var pos = positions[i]
@@ -196,27 +196,36 @@ func _physics_process(delta: float) -> void:
 		if hit_timers[i] > 0.0:
 			hit_timers[i] -= delta
 
-		var col = _get_enemy_color(types[i], hit_timers[i] > 0.0)
-		var scale_factor = 1.6 if types[i] == 2 else (0.85 if types[i] == 1 else 1.0)
-		
-		# Wiggle scuttle animation while walking
-		var scuttle_wiggle = sin(Time.get_ticks_msec() * 0.02 + float(i)) * 0.15
-		var rot = velocities[i].angle() + PI * 0.5 + scuttle_wiggle
-		var t = Transform2D(rot, Vector2(scale_factor, scale_factor), 0.0, positions[i])
-		
-		mm.set_instance_transform_2d(i, t)
-		mm.set_instance_color(i, col)
+		var is_hit = hit_timers[i] > 0.0
+		var col = Color(5.0, 5.0, 5.0, 1.0) if is_hit else Color(1.0, 1.0, 1.0, 1.0)
+		var t_type = types[i]
 
-func _get_enemy_color(enemy_type: int, is_hit: bool) -> Color:
-	if is_hit:
-		return Color(4.5, 4.5, 4.5, 1.0) # Intense HDR White flash
-	match enemy_type:
-		1: # Scout: Electric Violet
-			return Color(1.1, 0.35, 1.8, 1.0)
-		2: # Brute: Magma Amber
-			return Color(1.8, 0.8, 0.1, 1.0)
-		_: # Crawler: Blood Crimson
-			return Color(1.2, 0.25, 0.2, 1.0)
+		match t_type:
+			1: # Scout
+				var hover_wiggle = sin(ticks * 24.0 + float(i) * 2.0) * 0.12
+				var rot = velocities[i].angle() + PI * 0.5 + hover_wiggle
+				var t = Transform2D(rot, Vector2.ONE, 0.0, positions[i])
+				mm_scout.set_instance_transform_2d(s_idx, t)
+				mm_scout.set_instance_color(s_idx, col)
+				s_idx += 1
+			2: # Brute
+				var heavy_tread = sin(ticks * 8.0 + float(i)) * 0.07
+				var rot = velocities[i].angle() + PI * 0.5 + heavy_tread
+				var t = Transform2D(rot, Vector2.ONE, 0.0, positions[i])
+				mm_brute.set_instance_transform_2d(b_idx, t)
+				mm_brute.set_instance_color(b_idx, col)
+				b_idx += 1
+			_: # Crawler
+				var scuttle = sin(ticks * 16.0 + float(i) * 1.5) * 0.18
+				var rot = velocities[i].angle() + PI * 0.5 + scuttle
+				var t = Transform2D(rot, Vector2.ONE, 0.0, positions[i])
+				mm_crawler.set_instance_transform_2d(c_idx, t)
+				mm_crawler.set_instance_color(c_idx, col)
+				c_idx += 1
+
+	mm_crawler.visible_instance_count = c_idx
+	mm_scout.visible_instance_count = s_idx
+	mm_brute.visible_instance_count = b_idx
 
 func damage_in_radius(center: Vector2, radius: float, damage: float, knockback: float) -> int:
 	var hit_count = 0
@@ -326,5 +335,4 @@ func _kill_enemy(idx: int) -> void:
 		damages[idx] = damages[last_idx]
 
 	active_count -= 1
-	multi_mesh_inst.multimesh.visible_instance_count = active_count
 	swarm_count_changed.emit(active_count)
