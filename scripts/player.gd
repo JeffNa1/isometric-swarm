@@ -13,7 +13,7 @@ signal player_died()
 
 var current_health: float = 100.0
 var move_speed: float = 250.0
-var pickup_radius: float = 140.0
+var pickup_radius: float = 48.0
 
 var xp: int = 0
 var level: int = 1
@@ -321,7 +321,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 			move_speed += 35.0
 		"magnet":
 			passive_levels["magnet"] = min(5, passive_levels["magnet"] + 1)
-			pickup_radius += 65.0
+			pickup_radius += 18.0
 		"amp":
 			passive_levels["amp"] = min(5, passive_levels["amp"] + 1)
 			if railgun_weapon: railgun_weapon.upgrade_damage(1.2)

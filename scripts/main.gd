@@ -283,21 +283,47 @@ func _on_enemy_killed(xp_val: int, pos: Vector2, is_boss: bool) -> void:
 
 	# Spawn physical XP Gem (Drop chance 30% for fodder, 100% for bosses)
 	if randf() < 0.30 or is_boss:
-		if active_gems.size() >= 300 and not is_boss:
-			# Vampire Survivors gem consolidation: upgrade an existing gem instead of creating new node
-			var target_gem = active_gems[randi() % active_gems.size()]
-			if is_instance_valid(target_gem):
-				target_gem.xp_value += xp_val
-				target_gem.is_super_gem = true
-				target_gem.queue_redraw()
-		else:
-			var gem = GemScene.instantiate()
-			gem.xp_value = xp_val
-			gem.is_super_gem = is_boss
-			gem.global_position = pos
-			active_gems.append(gem)
-			gem.tree_exited.connect(func(): active_gems.erase(gem))
-			entities_container.call_deferred("add_child", gem)
+		var merged = false
+		if not is_boss and not active_gems.is_empty():
+			# 1. Proximity Cluster Consolidation: Merge into nearby stationary gem (within 75px)
+			for g in active_gems:
+				if is_instance_valid(g) and g.target == null:
+					if g.global_position.distance_squared_to(pos) <= 5625.0: # 75px * 75px
+						g.xp_value += xp_val
+						g.queue_redraw()
+						merged = true
+						break
+
+		if not merged:
+			# 2. Global Gem Cap (Max 90 gems on field): Merge into closest gem if cap reached
+			if active_gems.size() >= 90 and not is_boss:
+				var best_gem: Node2D = null
+				var best_dist_sq: float = INF
+				for g in active_gems:
+					if is_instance_valid(g) and g.target == null:
+						var d_sq = g.global_position.distance_squared_to(pos)
+						if d_sq < best_dist_sq:
+							best_dist_sq = d_sq
+							best_gem = g
+				if best_gem:
+					best_gem.xp_value += xp_val
+					best_gem.queue_redraw()
+				else:
+					var gem = GemScene.instantiate()
+					gem.xp_value = xp_val
+					gem.is_super_gem = is_boss
+					gem.global_position = pos
+					active_gems.append(gem)
+					gem.tree_exited.connect(func(): active_gems.erase(gem))
+					entities_container.call_deferred("add_child", gem)
+			else:
+				var gem = GemScene.instantiate()
+				gem.xp_value = xp_val
+				gem.is_super_gem = is_boss
+				gem.global_position = pos
+				active_gems.append(gem)
+				gem.tree_exited.connect(func(): active_gems.erase(gem))
+				entities_container.call_deferred("add_child", gem)
 
 func _trigger_combo_announcement(streak: int) -> void:
 	var title = "🔥 %d COMBO!" % streak
