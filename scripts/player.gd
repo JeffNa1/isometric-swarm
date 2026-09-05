@@ -342,8 +342,4 @@ func _draw() -> void:
 
 	draw_set_transform(recoil_offset, 0.0, Vector2(flip, 1.0))
 	draw_texture(tex, Vector2(-24.0, -41.0), col)
-
-	var pulse = 0.8 + 0.3 * sin(Time.get_ticks_msec() * 0.008)
-	draw_circle(Vector2(0, -22), 2.5, Color(0.3 * pulse, 2.5 * pulse, 3.5 * pulse, 0.75))
-
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

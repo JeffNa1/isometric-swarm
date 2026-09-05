@@ -276,102 +276,116 @@ static func create_player_frames() -> Array[ImageTexture]:
 		if frame_idx == 0: leg_phase = 1
 		elif frame_idx == 2: leg_phase = -1
 
-		# 1. Ground Shadow
+		# 1. Perfectly Centered Ground Shadow (ellipse centered at 24.0, 41.0)
 		for y in range(37, 46):
-			for x in range(12, 36):
-				var dx = (x - 24.0) / 11.0
+			for x in range(12, 37):
+				var dx = (x - 24.0) / 12.0
 				var dy = (y - 41.0) / 4.0
 				var dist = dx * dx + dy * dy
 				if dist <= 1.0:
 					var alpha = 0.5 * (1.0 - dist * 0.35)
 					img.set_pixel(x, y, Color(0.0, 0.0, 0.0, alpha))
 
-		# 2. Boots & Legs
-		var left_leg_x = 20 - (leg_phase * 3)
+		# 2. Symmetrical Exo-Boots & Legs
+		var left_leg_x = 19 - (leg_phase * 2)
 		var left_leg_y = 35 + (leg_phase * 1) + bob_y
-		var right_leg_x = 28 + (leg_phase * 3)
-		var right_leg_y = 36 - (leg_phase * 1) + bob_y
+		var right_leg_x = 29 + (leg_phase * 2)
+		var right_leg_y = 35 - (leg_phase * 1) + bob_y
 
 		for by in range(left_leg_y, left_leg_y + 4):
 			for bx in range(left_leg_x - 2, left_leg_x + 3):
 				if bx >= 0 and bx < w and by >= 0 and by < h:
 					var boot_col = Color(0.12, 0.15, 0.22, 1.0)
-					if by == left_leg_y: boot_col = Color(0.2, 0.35, 0.55, 1.0)
+					if by == left_leg_y: boot_col = Color(0.25, 0.4, 0.65, 1.0)
 					img.set_pixel(bx, by, boot_col)
 
 		for by in range(right_leg_y, right_leg_y + 4):
 			for bx in range(right_leg_x - 2, right_leg_x + 3):
 				if bx >= 0 and bx < w and by >= 0 and by < h:
 					var boot_col = Color(0.12, 0.15, 0.22, 1.0)
-					if by == right_leg_y: boot_col = Color(0.2, 0.35, 0.55, 1.0)
+					if by == right_leg_y: boot_col = Color(0.25, 0.4, 0.65, 1.0)
 					img.set_pixel(bx, by, boot_col)
 
-		# Heel Thrusters
+		# Symmetrical Heel Thruster Sparks
 		if frame_idx == 0 or frame_idx == 2:
-			var active_heel_x = left_leg_x - 2 if leg_phase > 0 else right_leg_x - 2
-			var active_heel_y = left_leg_y + 2 if leg_phase > 0 else right_leg_y + 2
-			if active_heel_x >= 0 and active_heel_x < w and active_heel_y >= 0 and active_heel_y < h:
-				img.set_pixel(active_heel_x, active_heel_y, Color(0.4, 2.0, 3.0, 1.0))
-				img.set_pixel(active_heel_x - 1, active_heel_y, Color(0.1, 1.2, 2.5, 0.8))
+			var thruster_x = left_leg_x - 2 if leg_phase > 0 else right_leg_x + 2
+			var thruster_y = left_leg_y + 2 if leg_phase > 0 else right_leg_y + 2
+			if thruster_x >= 0 and thruster_x < w and thruster_y >= 0 and thruster_y < h:
+				img.set_pixel(thruster_x, thruster_y, Color(0.4, 2.2, 3.5, 1.0))
 
-		# 3. Mech Armored Torso
+		# 3. Twin Heavy Jetpack Exhausts on Backpack
 		var torso_y = 18 + bob_y
+		for ty in range(torso_y - 3, torso_y + 3):
+			for tx in range(17, 20):
+				img.set_pixel(tx, ty, Color(0.18, 0.22, 0.3, 1.0))
+			for tx in range(29, 32):
+				img.set_pixel(tx, ty, Color(0.18, 0.22, 0.3, 1.0))
+		img.set_pixel(18, torso_y - 3, Color(0.3, 2.5, 3.5, 0.9))
+		img.set_pixel(30, torso_y - 3, Color(0.3, 2.5, 3.5, 0.9))
+
+		# 4. Symmetrical Mech Armored Torso
 		for y in range(torso_y, torso_y + 16):
-			for x in range(16, 32):
-				var dx = (x - 24.0) / 7.5
+			for x in range(16, 33):
+				var dx = (x - 24.0) / 8.0
 				var dy = (y - (torso_y + 8)) / 7.5
 				var dist = dx * dx + dy * dy
 				if dist <= 1.0:
-					var lum = 0.18 + (1.0 - dist) * 0.35
-					var col = Color(lum * 0.5, lum * 0.9, lum * 1.6, 1.0)
-					if abs(dx) > 0.8 or dy < -0.7:
-						col = Color(0.45, 0.75, 1.0, 1.0)
-					elif abs(x - 24) <= 1 and y <= torso_y + 6:
-						col = Color(0.65, 0.88, 1.0, 1.0)
+					var lum = 0.20 + (1.0 - dist) * 0.38
+					var col = Color(lum * 0.5, lum * 0.9, lum * 1.5, 1.0)
+					if abs(dx) > 0.75 or dy < -0.7:
+						col = Color(0.45, 0.72, 1.0, 1.0) # Highlight rim
+					elif abs(x - 24) <= 1 and y <= torso_y + 5:
+						col = Color(0.7, 0.9, 1.0, 1.0) # Central armor crest
 					img.set_pixel(x, y, col)
 
-		# 4. Shoulder Pauldrons
+		# 5. Symmetrical Heavy Pauldrons (Left: 12..17, Right: 31..36)
 		for py in range(torso_y + 1, torso_y + 7):
-			for px in range(13, 18):
-				img.set_pixel(px, py, Color(0.15, 0.3, 0.55, 1.0))
-			for px in range(30, 35):
-				img.set_pixel(px, py, Color(0.15, 0.3, 0.55, 1.0))
-		img.set_pixel(13, torso_y + 1, Color(0.6, 0.85, 1.0, 1.0))
-		img.set_pixel(34, torso_y + 1, Color(0.6, 0.85, 1.0, 1.0))
+			for px in range(12, 18):
+				var p_col = Color(0.16, 0.32, 0.55, 1.0)
+				if py == torso_y + 1: p_col = Color(0.65, 0.88, 1.0, 1.0)
+				img.set_pixel(px, py, p_col)
+			for px in range(31, 37):
+				var p_col = Color(0.16, 0.32, 0.55, 1.0)
+				if py == torso_y + 1: p_col = Color(0.65, 0.88, 1.0, 1.0)
+				img.set_pixel(px, py, p_col)
 
-		# 5. Glowing Cyber Reactor Core
-		for cy in range(torso_y + 7, torso_y + 11):
-			for cx in range(22, 27):
-				var r_dist = abs(cx - 24) + abs(cy - (torso_y + 9))
+		# 6. Symmetrical Arm Gauntlets (Left: 12..15, Right: 33..36)
+		for ay in range(torso_y + 7, torso_y + 14):
+			for ax in range(12, 16):
+				img.set_pixel(ax, ay, Color(0.14, 0.18, 0.25, 1.0))
+			for ax in range(33, 37):
+				img.set_pixel(ax, ay, Color(0.14, 0.18, 0.25, 1.0))
+		img.set_pixel(13, torso_y + 13, Color(0.3, 1.8, 2.8, 1.0))
+		img.set_pixel(35, torso_y + 13, Color(0.3, 1.8, 2.8, 1.0))
+
+		# 7. Symmetrical Glowing Cyber Reactor Core (Centered at 24.0, torso_y + 8)
+		for cy in range(torso_y + 6, torso_y + 11):
+			for cx in range(21, 28):
+				var r_dist = abs(cx - 24) + abs(cy - (torso_y + 8))
 				if r_dist <= 2:
-					img.set_pixel(cx, cy, Color(0.3, 2.5, 3.2, 1.0))
-		img.set_pixel(24, torso_y + 9, Color(2.0, 3.5, 4.0, 1.0))
+					img.set_pixel(cx, cy, Color(0.25, 2.6, 3.6, 1.0))
+		img.set_pixel(24, torso_y + 8, Color(2.5, 4.0, 4.5, 1.0))
 
-		# 6. Shoulder-Mounted Heavy Railgun Cannon
-		var gun_y = torso_y + 1
-		for gx in range(30, 44):
-			for gy in range(gun_y - 2, gun_y + 3):
-				var gun_col = Color(0.14, 0.16, 0.2, 1.0)
-				if gy == gun_y - 2: gun_col = Color(0.35, 0.38, 0.45, 1.0)
-				if (gx == 33 or gx == 37 or gx == 41) and abs(gy - gun_y) <= 1:
-					gun_col = Color(0.3, 2.2, 3.0, 1.0)
-				img.set_pixel(gx, gy, gun_col)
-		img.set_pixel(44, gun_y, Color(0.5, 2.5, 3.5, 1.0))
-
-		# 7. Cyber-Commander Armored Helm & Visor
+		# 8. Symmetrical Cyber-Commander Helm & Visor
 		var helm_y = torso_y - 8
 		for hy in range(helm_y, helm_y + 8):
-			for hx in range(19, 29):
-				var dx = (hx - 24.0) / 4.5
+			for hx in range(19, 30):
+				var dx = (hx - 24.0) / 5.0
 				var dy = (hy - (helm_y + 4)) / 4.0
 				if dx * dx + dy * dy <= 1.0:
-					var h_col = Color(0.82, 0.88, 0.95, 1.0)
-					if dy > 0.4: h_col = Color(0.2, 0.25, 0.35, 1.0)
+					var h_col = Color(0.85, 0.9, 0.98, 1.0)
+					if dy > 0.4: h_col = Color(0.22, 0.28, 0.38, 1.0)
 					img.set_pixel(hx, hy, h_col)
 
-		for vx in range(23, 28):
-			img.set_pixel(vx, helm_y + 4, Color(0.2, 3.0, 3.8, 1.0))
-			img.set_pixel(vx, helm_y + 5, Color(0.1, 2.2, 3.0, 1.0))
+		# Centered Tactical Antenna / Helmet Crest
+		for cy in range(helm_y - 3, helm_y + 1):
+			img.set_pixel(24, cy, Color(0.3, 2.5, 3.5, 1.0))
+
+		# Symmetrical Glowing Neon Visor (Centered at 24.0: 21 to 27)
+		for vx in range(21, 28):
+			img.set_pixel(vx, helm_y + 4, Color(0.3, 3.2, 4.2, 1.0))
+			img.set_pixel(vx, helm_y + 5, Color(0.15, 2.4, 3.2, 0.9))
+		img.set_pixel(24, helm_y + 4, Color(2.0, 4.0, 4.5, 1.0)) # Visor center reflection
 
 		frames.append(ImageTexture.create_from_image(img))
 
