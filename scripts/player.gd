@@ -31,11 +31,14 @@ var particle_mgr: Node2D = null
 @onready var railgun_weapon: Node2D = $Weapons/Railgun
 @onready var flame_weapon: Node2D = $Weapons/Flamethrower
 @onready var shockwave_weapon: Node2D = $Weapons/Shockwave
+@onready var missile_weapon: Node2D = $Weapons/MagicMissile
+@onready var blade_weapon: Node2D = $Weapons/BladeOrbit
 
 const SpriteFactory = preload("res://scripts/sprite_factory.gd")
 
 var player_frames: Array[ImageTexture] = []
 var active_frame: int = 0
+var recoil_offset: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	current_health = max_health
@@ -69,6 +72,9 @@ func _physics_process(delta: float) -> void:
 		hurt_flash_timer -= delta
 		queue_redraw()
 
+	if recoil_offset.length_squared() > 0.001:
+		recoil_offset = recoil_offset.move_toward(Vector2.ZERO, 70.0 * delta)
+
 	var input_x = Input.get_action_raw_strength("move_right") - Input.get_action_raw_strength("move_left")
 	var input_y = Input.get_action_raw_strength("move_down") - Input.get_action_raw_strength("move_up")
 	var raw_input = Vector2(input_x, input_y)
@@ -93,6 +99,16 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	queue_redraw()
+
+func apply_recoil(dir: Vector2, force: float) -> void:
+	recoil_offset += dir.normalized() * force
+	recoil_offset = recoil_offset.limit_length(9.0)
+	queue_redraw()
+
+func trigger_hit_stop(duration: float = 0.035) -> void:
+	get_tree().paused = true
+	await get_tree().create_timer(duration, true, false, true).timeout
+	get_tree().paused = false
 
 func take_damage(amount: float) -> void:
 	if current_health <= 0.0:
@@ -143,8 +159,14 @@ func apply_upgrade(upgrade_id: String) -> void:
 			if flame_weapon: flame_weapon.upgrade_flame()
 		"shockwave":
 			if shockwave_weapon: shockwave_weapon.upgrade_blast()
+		"missile":
+			if missile_weapon: missile_weapon.upgrade_missile()
+		"blade":
+			if blade_weapon: blade_weapon.upgrade_blade()
 		"damage":
 			if railgun_weapon: railgun_weapon.upgrade_damage(1.3)
+			if missile_weapon: missile_weapon.upgrade_damage(1.3)
+			if blade_weapon: blade_weapon.upgrade_damage(1.3)
 		"speed":
 			move_speed += 40.0
 		"health":
@@ -159,8 +181,8 @@ func _draw() -> void:
 	var flip = 1.0 if facing_right else -1.0
 	var col = Color(5.0, 5.0, 5.0, 1.0) if hurt_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, 1.0)
 
-	# Transform for horizontal flip
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2(flip, 1.0))
+	# Transform for horizontal flip & recoil kick
+	draw_set_transform(recoil_offset, 0.0, Vector2(flip, 1.0))
 	draw_texture(tex, Vector2(-24.0, -41.0), col)
 
 	# Dynamic HDR reactor pulse accent

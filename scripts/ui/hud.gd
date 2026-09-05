@@ -29,6 +29,8 @@ const UPGRADES = [
 	{"id": "railgun", "title": "⚡ CƯỜNG HÓA RAILGUN", "desc": "Tăng mạnh độ rộng chùm laser và sát thương xuyên thấu bầy quái."},
 	{"id": "flame", "title": "🔥 BÃO LỬA PLASMA", "desc": "Mở rộng góc thiêu đốt và tầm phun lửa phía trước mặt."},
 	{"id": "shockwave", "title": "💥 SÓNG CHẤN ĐỘNG NOVA", "desc": "Tăng bán kính nổ hất tung quái và giảm thời gian nạp chiêu."},
+	{"id": "missile", "title": "🚀 TÊN LỬA TỰ DẪN", "desc": "Bổ sung loạt tên lửa đạn đạo tầm nhiệt nổ tung đạn chùm xé nát bầy quái."},
+	{"id": "blade", "title": "🌀 LƯỠI HÁI QUỸ ĐẠO", "desc": "Bổ sung lưỡi dao năng lượng xoay quanh người chém nát quái áp sát."},
 	{"id": "damage", "title": "⚔️ TĂNG 30% SÁT THƯƠNG", "desc": "Gia tăng uy lực tiêu diệt hàng loạt trên mọi vũ khí."},
 	{"id": "speed", "title": "👟 ĐỘNG CƠ PHẢN LỰC", "desc": "Tăng 40 tốc độ di chuyển để luồn lách né tránh vòng vây."},
 	{"id": "health", "title": "❤️ TĂNG CƯỜNG SINH LỰC", "desc": "Tăng 40 máu tối đa và hồi phục khẩn cấp 80 HP ngay lập tức."}

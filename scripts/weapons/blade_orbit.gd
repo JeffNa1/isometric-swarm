@@ -1,22 +1,42 @@
 extends Node2D
 
-@export var blade_count: int = 1
-@export var damage: float = 25.0
-@export var rotation_speed: float = 3.5
-@export var orbit_radius: float = 75.0
-@export var knockback_force: float = 220.0
+@export var blade_count: int = 2
+@export var damage: float = 32.0
+@export var rotation_speed: float = 4.2
+@export var orbit_radius: float = 85.0
+@export var knockback_force: float = 240.0
 
 var current_angle: float = 0.0
-var active_blades: Array[Area2D] = []
+var swarm_mgr: Node2D = null
+var sound_mgr: Node = null
+var particle_mgr: Node2D = null
+
+# Blade trail history: Array of Arrays of Vector2
+var blade_trails: Array = []
+const TRAIL_LENGTH: int = 8
 
 func _ready() -> void:
-	rebuild_blades()
+	_get_managers()
+	_init_trails()
+
+func _get_managers() -> void:
+	var cur = get_tree().current_scene
+	if cur:
+		swarm_mgr = cur.get_node_or_null("SwarmManager")
+		sound_mgr = cur.get_node_or_null("SoundManager")
+		particle_mgr = cur.get_node_or_null("ParticleManager")
+
+func _init_trails() -> void:
+	blade_trails.clear()
+	for i in range(blade_count):
+		var t_arr: Array[Vector2] = []
+		blade_trails.append(t_arr)
 
 func upgrade_blade() -> void:
 	blade_count += 1
-	damage += 5.0
-	orbit_radius += 8.0
-	rebuild_blades()
+	damage += 8.0
+	orbit_radius += 10.0
+	_init_trails()
 
 func upgrade_damage(multiplier: float) -> void:
 	damage *= multiplier
@@ -24,82 +44,97 @@ func upgrade_damage(multiplier: float) -> void:
 func upgrade_speed(multiplier: float) -> void:
 	rotation_speed *= multiplier
 
-func rebuild_blades() -> void:
-	for b in active_blades:
-		if is_instance_valid(b):
-			b.queue_free()
-	active_blades.clear()
-
-	for i in range(blade_count):
-		var blade = Area2D.new()
-		blade.name = "Blade_%d" % i
-		blade.collision_layer = 0
-		blade.collision_mask = 2 # Enemies are layer 2
-		blade.monitoring = true
-		blade.monitorable = false
-		
-		var col = CollisionShape2D.new()
-		var shape = CircleShape2D.new()
-		shape.radius = 16.0
-		col.shape = shape
-		blade.add_child(col)
-		
-		blade.area_entered.connect(_on_blade_hit.bind(blade))
-		blade.body_entered.connect(_on_blade_body_hit.bind(blade))
-		add_child(blade)
-		active_blades.append(blade)
-
 func _physics_process(delta: float) -> void:
+	if not swarm_mgr:
+		_get_managers()
+
 	current_angle += rotation_speed * delta
 	if current_angle > TAU:
 		current_angle -= TAU
-		
-	for i in range(active_blades.size()):
-		var angle_offset = (TAU / float(active_blades.size())) * float(i)
+
+	# Ensure trail arrays match count
+	while blade_trails.size() < blade_count:
+		blade_trails.append([])
+
+	var hit_this_frame = false
+
+	for i in range(blade_count):
+		var angle_offset = (TAU / float(blade_count)) * float(i)
 		var angle = current_angle + angle_offset
-		# 2:1 isometric ellipse compression: Y is 0.5 * X
+		# 2:1 isometric ellipse compression: Y is 0.5 * X, centered at character waist (-14px)
 		var blade_pos = Vector2(
 			cos(angle) * orbit_radius,
-			sin(angle) * orbit_radius * 0.5 - 12.0 # -12 to align with character waist
+			sin(angle) * orbit_radius * 0.5 - 14.0
 		)
-		active_blades[i].position = blade_pos
-		
+
+		# Record trail
+		var trail = blade_trails[i] as Array
+		trail.push_front(blade_pos)
+		if trail.size() > TRAIL_LENGTH:
+			trail.pop_back()
+
+		# Hit-check against swarm
+		if swarm_mgr and swarm_mgr.active_count > 0:
+			var world_blade = global_position + blade_pos
+			var hits = swarm_mgr.damage_in_radius(world_blade, 26.0, damage * delta * 4.0, knockback_force)
+			if hits > 0:
+				hit_this_frame = true
+				if particle_mgr and randf() < 0.35:
+					particle_mgr.spawn_sparks(world_blade, Color(0.4, 2.5, 3.5, 1.0), 3)
+
+	if hit_this_frame and sound_mgr and randf() < 0.2:
+		sound_mgr.play_scythe_slice()
+
 	queue_redraw()
 
-func _on_blade_body_hit(body: Node2D, blade: Area2D) -> void:
-	if body.has_method("take_damage"):
-		var knock_dir = (body.global_position - global_position).normalized()
-		body.take_damage(damage, knock_dir * knockback_force)
-
-func _on_blade_hit(area: Area2D, blade: Area2D) -> void:
-	var parent = area.get_parent()
-	if parent and parent.has_method("take_damage"):
-		var knock_dir = (parent.global_position - global_position).normalized()
-		parent.take_damage(damage, knock_dir * knockback_force)
-
 func _draw() -> void:
-	# Draw orbit indicator trail (subtle isometric ellipse)
-	draw_set_transform(Vector2(0, -12), 0.0, Vector2(1.0, 0.5))
-	draw_arc(Vector2.ZERO, orbit_radius, 0.0, TAU, 36, Color(0.3, 0.7, 1.0, 0.15), 2.0)
+	# 1. Subtle Orbit Ring (Isometric Ellipse)
+	draw_set_transform(Vector2(0, -14), 0.0, Vector2(1.0, 0.5))
+	draw_arc(Vector2.ZERO, orbit_radius, 0.0, TAU, 48, Color(0.2, 0.8, 1.2, 0.18), 2.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
-	# Draw each blade (energy scythe / sword)
-	for blade in active_blades:
-		if not is_instance_valid(blade):
+	# 2. Draw Motion Blur Trails
+	for i in range(blade_count):
+		if i >= blade_trails.size():
 			continue
-		var pos = blade.position
-		# Shadow under blade
-		draw_set_transform(Vector2(pos.x, 0), 0.0, Vector2(1.0, 0.5))
-		draw_circle(Vector2.ZERO, 6.0, Color(0.0, 0.0, 0.0, 0.25))
+		var trail = blade_trails[i] as Array
+		if trail.size() >= 2:
+			for t_idx in range(trail.size() - 1):
+				var p1 = trail[t_idx] as Vector2
+				var p2 = trail[t_idx + 1] as Vector2
+				var alpha = 1.0 - (float(t_idx) / float(trail.size()))
+				draw_line(p1, p2, Color(0.2, 1.8, 2.8, 0.55 * alpha), 4.0 * alpha)
+
+	# 3. Draw Each Energy Scythe / Glaive
+	for i in range(blade_count):
+		var angle_offset = (TAU / float(blade_count)) * float(i)
+		var angle = current_angle + angle_offset
+		var blade_pos = Vector2(
+			cos(angle) * orbit_radius,
+			sin(angle) * orbit_radius * 0.5 - 14.0
+		)
+
+		# Ground shadow under blade
+		draw_set_transform(Vector2(blade_pos.x, 0), 0.0, Vector2(1.0, 0.5))
+		draw_circle(Vector2.ZERO, 7.0, Color(0.0, 0.0, 0.0, 0.35))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		
-		# Blade glow & polygon
-		var blade_pts = PackedVector2Array([
-			pos + Vector2(0, -14),
-			pos + Vector2(8, 0),
-			pos + Vector2(0, 8),
-			pos + Vector2(-8, 0)
+
+		# Crescent Scythe Blade
+		var spin_rot = angle + PI * 0.5
+		draw_set_transform(blade_pos, spin_rot, Vector2.ONE)
+
+		var scythe_poly = PackedVector2Array([
+			Vector2(0, -16),
+			Vector2(10, -8),
+			Vector2(14, 0),
+			Vector2(8, 6),
+			Vector2(0, 8),
+			Vector2(5, 0),
+			Vector2(4, -8)
 		])
-		draw_circle(pos, 9.0, Color(0.2, 0.8, 1.0, 0.3))
-		draw_colored_polygon(blade_pts, Color(0.3, 0.9, 1.0, 0.95))
-		draw_circle(pos, 3.5, Color(1.0, 1.0, 1.0, 1.0))
+		draw_colored_polygon(scythe_poly, Color(0.2, 2.2, 3.2, 0.95))
+		# Specular cutting edge
+		draw_line(Vector2(0, -16), Vector2(14, 0), Color(3.5, 3.5, 3.5, 1.0), 2.0)
+		draw_circle(Vector2(0, 0), 3.5, Color(2.5, 3.0, 3.5, 1.0))
+
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

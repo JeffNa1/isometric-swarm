@@ -2,59 +2,81 @@ extends Node2D
 
 const MISSILE_SCENE = preload("res://scenes/weapons/missile_projectile.tscn")
 
-@export var damage: float = 40.0
-@export var fire_rate: float = 1.2 # seconds between shots
-@export var missiles_per_volley: int = 1
-@export var attack_range: float = 500.0
+@export var damage: float = 45.0
+@export var fire_rate: float = 1.1
+@export var missiles_per_volley: int = 2
+@export var attack_range: float = 650.0
 
 var fire_timer: float = 0.0
+var swarm_mgr: Node2D = null
+var sound_mgr: Node = null
+
+func _ready() -> void:
+	_get_managers()
+
+func _get_managers() -> void:
+	var cur = get_tree().current_scene
+	if cur:
+		swarm_mgr = cur.get_node_or_null("SwarmManager")
+		sound_mgr = cur.get_node_or_null("SoundManager")
 
 func _process(delta: float) -> void:
+	if not swarm_mgr:
+		_get_managers()
+
 	fire_timer += delta
 	if fire_timer >= fire_rate:
 		fire_timer = 0.0
 		_attempt_fire()
 
 func _attempt_fire() -> void:
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	if enemies.is_empty():
+	if not swarm_mgr or swarm_mgr.active_count == 0:
 		return
-		
-	# Sort enemies by distance
-	var player_pos = global_position
-	var sorted_enemies = []
-	for e in enemies:
-		if is_instance_valid(e):
-			var dist = player_pos.distance_to(e.global_position)
-			if dist <= attack_range:
-				sorted_enemies.append({"enemy": e, "dist": dist})
-				
-	if sorted_enemies.is_empty():
-		return
-		
-	sorted_enemies.sort_custom(func(a, b): return a.dist < b.dist)
-	
-	# Fire volley
-	var shots = min(missiles_per_volley, sorted_enemies.size())
-	for i in range(shots):
-		var target = sorted_enemies[i].enemy
-		_spawn_missile(target)
 
-func _spawn_missile(target: Node2D) -> void:
+	var origin_pos = global_position
+	# Find candidate targets in swarm
+	var targets: Array[Vector2] = []
+	var sample_count = min(swarm_mgr.active_count, 60)
+
+	for i in range(sample_count):
+		var p = swarm_mgr.positions[i]
+		var dist = origin_pos.distance_to(p)
+		if dist <= attack_range and dist > 40.0:
+			targets.append(p)
+
+	if targets.is_empty():
+		return
+
+	# Fire volley
+	var shots = min(missiles_per_volley, targets.size())
+	for i in range(shots):
+		var target_pos = targets[i]
+		_spawn_missile(target_pos, i)
+
+	if sound_mgr and sound_mgr.has_method("play_missile_launch"):
+		sound_mgr.play_missile_launch()
+
+func _spawn_missile(target_pos: Vector2, volley_idx: int) -> void:
 	var projectile = MISSILE_SCENE.instantiate()
-	var dir = (target.global_position - global_position).normalized()
-	# Spawn at entities container or root
 	var entities = get_tree().current_scene.get_node_or_null("Entities")
 	if not entities:
 		entities = get_parent()
-		
+
 	entities.add_child(projectile)
-	projectile.global_position = global_position + Vector2(0, -16)
-	projectile.setup(dir, target, damage)
+	# Stagger launch positions on shoulders
+	var launch_offset = Vector2(-12.0 if volley_idx % 2 == 0 else 12.0, -26.0)
+	projectile.global_position = global_position + launch_offset
+
+	var base_dir = (target_pos - projectile.global_position).normalized()
+	# Add slight initial spread angle
+	var spread_angle = base_dir.angle() + randf_range(-0.35, 0.35)
+	var fire_dir = Vector2.from_angle(spread_angle)
+
+	projectile.setup(fire_dir, target_pos, damage)
 
 func upgrade_missile() -> void:
 	missiles_per_volley += 1
-	damage += 10.0
+	damage += 15.0
 	fire_rate = max(0.4, fire_rate * 0.85)
 
 func upgrade_damage(multiplier: float) -> void:
