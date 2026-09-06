@@ -2,9 +2,9 @@ extends Node2D
 
 const LightHelper = preload("res://scripts/light_helper.gd")
 
-@export var damage: float = 55.0
-@export var fire_rate: float = 0.9
-@export var chain_count: int = 4
+@export var damage: float = 38.0
+@export var fire_rate: float = 0.95
+@export var chain_count: int = 3
 @export var attack_range: float = 500.0
 @export var chain_range: float = 160.0
 
@@ -16,6 +16,7 @@ var swarm_mgr: Node2D = null
 var sound_mgr: Node = null
 var particle_mgr: Node2D = null
 var camera_node: Camera2D = null
+var player_ref: CharacterBody2D = null
 
 @onready var tesla_light: PointLight2D = $TeslaLight
 
@@ -35,9 +36,10 @@ func _get_managers() -> void:
 		sound_mgr = cur.get_node_or_null("SoundManager")
 		particle_mgr = cur.get_node_or_null("ParticleManager")
 		camera_node = cur.get_node_or_null("Camera2D")
+		player_ref = cur.get_node_or_null("Entities/Player")
 
 func _process(delta: float) -> void:
-	if not swarm_mgr:
+	if not swarm_mgr or not player_ref:
 		_get_managers()
 
 	if bolt_timer > 0.0:
@@ -52,8 +54,11 @@ func _process(delta: float) -> void:
 			active_arcs.clear()
 			queue_redraw()
 
+	var cd_mult = player_ref.cooldown_reduction if (player_ref and "cooldown_reduction" in player_ref) else 0.0
+	var actual_rate = max(0.2, fire_rate * (1.0 - cd_mult))
+
 	fire_timer += delta
-	if fire_timer >= fire_rate:
+	if fire_timer >= actual_rate:
 		fire_timer = 0.0
 		_attempt_fire()
 
@@ -109,7 +114,13 @@ func _fire_chain(start_idx: int) -> void:
 	var current_world_pos = swarm_mgr.positions[current_idx]
 	hit_indices[current_idx] = true
 
-	swarm_mgr._apply_damage_to_index(current_idx, damage, Vector2.ZERO, is_evolved)
+	var crit_info = player_ref.roll_crit(damage) if (player_ref and player_ref.has_method("roll_crit")) else {"damage": damage, "is_crit": false}
+	var hit_damage = float(crit_info["damage"])
+	var is_crit = bool(crit_info["is_crit"])
+
+	swarm_mgr._apply_damage_to_index(current_idx, hit_damage, Vector2.ZERO, is_crit)
+	if player_ref and player_ref.has_method("record_weapon_damage"):
+		player_ref.record_weapon_damage("tesla", hit_damage)
 	chain_points.append(to_local(current_world_pos))
 
 	if particle_mgr:
@@ -139,7 +150,10 @@ func _fire_chain(start_idx: int) -> void:
 		hit_indices[current_idx] = true
 
 		var chain_falloff = 1.0 - (float(step) * 0.08)
-		swarm_mgr._apply_damage_to_index(current_idx, damage * chain_falloff, Vector2.ZERO, false)
+		var sub_damage = hit_damage * chain_falloff
+		swarm_mgr._apply_damage_to_index(current_idx, sub_damage, Vector2.ZERO, false)
+		if player_ref and player_ref.has_method("record_weapon_damage"):
+			player_ref.record_weapon_damage("tesla", sub_damage)
 		chain_points.append(to_local(current_world_pos))
 
 		if particle_mgr:
@@ -181,19 +195,19 @@ func _draw() -> void:
 
 func evolve_mjolnir() -> void:
 	is_evolved = true
-	damage = 110.0
-	fire_rate = 0.38
-	chain_count = 8
-	chain_range = 220.0
-	attack_range = 650.0
+	damage = 85.0
+	fire_rate = 0.48
+	chain_count = 6
+	chain_range = 200.0
+	attack_range = 600.0
 	if tesla_light:
 		tesla_light.color = Color(2.5, 2.0, 0.4, 1.0)
 
 func upgrade_tesla() -> void:
 	chain_count += 1
-	damage += 14.0
-	fire_rate = max(0.32, fire_rate * 0.88)
-	attack_range += 30.0
+	damage += 9.0
+	fire_rate = max(0.45, fire_rate * 0.90)
+	attack_range += 25.0
 
 func upgrade_damage(multiplier: float) -> void:
 	damage *= multiplier

@@ -53,7 +53,12 @@ func take_damage(amount: float) -> void:
 	if current_health <= 0.0:
 		_break_crate()
 
+var is_broken: bool = false
+
 func _break_crate() -> void:
+	if is_broken:
+		return
+	is_broken = true
 	if not sound_mgr:
 		_get_managers()
 

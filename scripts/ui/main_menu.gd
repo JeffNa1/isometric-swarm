@@ -2,6 +2,7 @@ class_name MainMenu
 extends Control
 
 const SpriteFactory = preload("res://scripts/sprite_factory.gd")
+const SaveManagerClass = preload("res://scripts/save_manager.gd")
 
 # Sound manager instance
 var sound_mgr: Node = null
@@ -29,6 +30,8 @@ static var show_damage_numbers: bool = true
 @onready var buttons_vbox: VBoxContainer = $Margin/Content/LeftCol/ButtonsVBox
 
 @onready var btn_play: Button = $Margin/Content/LeftCol/ButtonsVBox/BtnPlay
+@onready var btn_operatives: Button = $Margin/Content/LeftCol/ButtonsVBox/BtnOperatives
+@onready var btn_armory: Button = $Margin/Content/LeftCol/ButtonsVBox/BtnArmory
 @onready var btn_how_to_play: Button = $Margin/Content/LeftCol/ButtonsVBox/BtnHowToPlay
 @onready var btn_settings: Button = $Margin/Content/LeftCol/ButtonsVBox/BtnSettings
 @onready var btn_credits: Button = $Margin/Content/LeftCol/ButtonsVBox/BtnCredits
@@ -38,6 +41,14 @@ static var show_damage_numbers: bool = true
 @onready var settings_modal: PanelContainer = $SettingsModal
 @onready var how_to_play_modal: PanelContainer = $HowToPlayModal
 @onready var credits_modal: PanelContainer = $CreditsModal
+@onready var operatives_modal: PanelContainer = $OperativesModal
+@onready var armory_modal: PanelContainer = $ArmoryModal
+
+# Stats Panel References
+@onready var nanite_label: Label = $Margin/Content/RightCol/StatsPanel/Margin/StatsVBox/NaniteLabel
+@onready var record_label: Label = $Margin/Content/RightCol/StatsPanel/Margin/StatsVBox/RecordLabel
+@onready var kills_label: Label = $Margin/Content/RightCol/StatsPanel/Margin/StatsVBox/KillsLabel
+@onready var op_label: Label = $Margin/Content/RightCol/StatsPanel/Margin/StatsVBox/OperativeLabel
 
 # Settings elements
 @onready var volume_slider: HSlider = $SettingsModal/VBox/VolumeRow/VolumeSlider
@@ -57,6 +68,17 @@ var btn_target_scales: Dictionary = {}
 var btn_chevrons: Dictionary = {}
 
 func _ready() -> void:
+	# Force window to center and bring to foreground on the active screen
+	var screen_size = DisplayServer.screen_get_size()
+	var win_size = DisplayServer.window_get_size()
+	DisplayServer.window_set_position(Vector2i(Vector2(screen_size - win_size) * 0.5))
+	DisplayServer.window_move_to_foreground()
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, true)
+	get_tree().create_timer(1.2).timeout.connect(func():
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, false)
+	)
+
+	SaveManagerClass.init_and_load()
 	# Instantiate or find sound manager
 	sound_mgr = get_node_or_null("SoundManager")
 	if not sound_mgr:
@@ -67,6 +89,7 @@ func _ready() -> void:
 	_init_background_elements()
 	_setup_button_visuals_and_signals()
 	_setup_modals()
+	_update_stats_display()
 
 	if transition_rect:
 		transition_rect.visible = true
@@ -103,10 +126,12 @@ func _init_background_elements() -> void:
 func _setup_button_visuals_and_signals() -> void:
 	var buttons = [
 		{"btn": btn_play, "code": "01", "title": "CHIẾN DỊCH MỚI", "desc": "Bắt đầu cuộc chiến sinh tồn vô tận", "icon": "play", "color": Color(0.2, 2.8, 3.8, 1.0)},
-		{"btn": btn_how_to_play, "code": "02", "title": "CẨM NANG SINH TỒN", "desc": "Hệ thống vũ khí, tiến hóa & di chuyển", "icon": "how_to_play", "color": Color(0.2, 3.5, 1.8, 1.0)},
-		{"btn": btn_settings, "code": "03", "title": "THIẾT LẬP HỆ THỐNG", "desc": "Âm lượng, rung chấn & số sát thương", "icon": "settings", "color": Color(3.5, 2.4, 0.4, 1.0)},
-		{"btn": btn_credits, "code": "04", "title": "DANH THẦN & ĐỘI NGŨ", "desc": "Bản quyền & đội ngũ phát triển game", "icon": "credits", "color": Color(3.5, 3.0, 0.6, 1.0)},
-		{"btn": btn_quit, "code": "05", "title": "THOÁT TRÒ CHƠI", "desc": "Lưu trạng thái & trở về desktop", "icon": "quit", "color": Color(3.8, 0.35, 0.45, 1.0)}
+		{"btn": btn_operatives, "code": "02", "title": "CHỌN CHIẾN BINH", "desc": "4 Đặc nhiệm: Vex, Pyro, Volt, Colossus", "icon": "evolution", "color": Color(0.4, 2.6, 3.8, 1.0)},
+		{"btn": btn_armory, "code": "03", "title": "KHO CÔNG NGHỆ CYBER", "desc": "Nâng cấp vĩnh viễn 11 chỉ số tác chiến", "icon": "chest", "color": Color(3.8, 2.2, 0.4, 1.0)},
+		{"btn": btn_how_to_play, "code": "04", "title": "CẨM NANG SINH TỒN", "desc": "Hệ thống vũ khí, tiến hóa & di chuyển", "icon": "how_to_play", "color": Color(0.2, 3.5, 1.8, 1.0)},
+		{"btn": btn_settings, "code": "05", "title": "THIẾT LẬP HỆ THỐNG", "desc": "Âm lượng, rung chấn & số sát thương", "icon": "settings", "color": Color(3.5, 2.4, 0.4, 1.0)},
+		{"btn": btn_credits, "code": "06", "title": "DANH THẦN & ĐỘI NGŨ", "desc": "Bản quyền & đội ngũ phát triển game", "icon": "credits", "color": Color(3.5, 3.0, 0.6, 1.0)},
+		{"btn": btn_quit, "code": "07", "title": "THOÁT TRÒ CHƠI", "desc": "Lưu trạng thái & trở về desktop", "icon": "quit", "color": Color(3.8, 0.35, 0.45, 1.0)}
 	]
 
 	for b_data in buttons:
@@ -225,6 +250,8 @@ func _setup_button_visuals_and_signals() -> void:
 		b.mouse_exited.connect(func(): _on_button_unhover(b))
 
 	btn_play.pressed.connect(_on_play_pressed)
+	btn_operatives.pressed.connect(_on_operatives_pressed)
+	btn_armory.pressed.connect(_on_armory_pressed)
 	btn_how_to_play.pressed.connect(_on_how_to_play_pressed)
 	btn_settings.pressed.connect(_on_settings_pressed)
 	btn_credits.pressed.connect(_on_credits_pressed)
@@ -234,6 +261,8 @@ func _setup_modals() -> void:
 	settings_modal.hide()
 	how_to_play_modal.hide()
 	credits_modal.hide()
+	operatives_modal.hide()
+	armory_modal.hide()
 
 	# Volume setup
 	volume_slider.value = master_volume * 100.0
@@ -253,6 +282,9 @@ func _setup_modals() -> void:
 	btn_settings_back.pressed.connect(func(): _close_modal(settings_modal))
 	$HowToPlayModal/VBox/BtnHowToPlayBack.pressed.connect(func(): _close_modal(how_to_play_modal))
 	$CreditsModal/VBox/BtnCreditsBack.pressed.connect(func(): _close_modal(credits_modal))
+	$OperativesModal/Margin/VBox/BtnOperativesBack.pressed.connect(func(): _close_modal(operatives_modal))
+	$ArmoryModal/Margin/VBox/BottomRow/BtnArmoryBack.pressed.connect(func(): _close_modal(armory_modal))
+	$ArmoryModal/Margin/VBox/BottomRow/BtnRefund.pressed.connect(_on_refund_pressed)
 
 	# Populate How To Play Cards with procedural icons
 	_setup_how_to_play_cards()
@@ -455,3 +487,221 @@ func _update_dmg_num_btn_visual() -> void:
 		dmg_num_btn.text = " [ BẬT ] " if show_damage_numbers else " [ TẮT ] "
 		var col = Color(0.2, 3.5, 1.8, 1.0) if show_damage_numbers else Color(3.8, 0.3, 0.4, 1.0)
 		dmg_num_btn.add_theme_color_override("font_color", col)
+
+func _on_operatives_pressed() -> void:
+	if sound_mgr and sound_mgr.has_method("play_ui_click"):
+		sound_mgr.play_ui_click()
+	_setup_operatives_modal()
+	_open_modal(operatives_modal)
+
+func _on_armory_pressed() -> void:
+	if sound_mgr and sound_mgr.has_method("play_ui_click"):
+		sound_mgr.play_ui_click()
+	_setup_armory_modal()
+	_open_modal(armory_modal)
+
+func _on_refund_pressed() -> void:
+	if sound_mgr and sound_mgr.has_method("play_ui_click"):
+		sound_mgr.play_ui_click()
+	SaveManagerClass.refund_all_upgrades()
+	_update_stats_display()
+	_setup_armory_modal()
+
+func _update_stats_display() -> void:
+	SaveManagerClass.init_and_load()
+	if nanite_label:
+		nanite_label.text = "NANITE CORES: %d 💎" % SaveManagerClass.nanites
+	if record_label:
+		var mins = int(SaveManagerClass.best_time / 60.0)
+		var secs = int(SaveManagerClass.best_time) % 60
+		record_label.text = "KỶ LỤC SINH TỒN: %02d:%02d" % [mins, secs]
+	if kills_label:
+		kills_label.text = "TỔNG TIÊU DIỆT: %d QUÁI" % SaveManagerClass.total_kills
+	if op_label:
+		var op_info = SaveManagerClass.operative_defs.get(SaveManagerClass.selected_operative, {})
+		var op_name = op_info.get("name", "VEX")
+		op_label.text = "CHIẾN BINH: %s" % op_name
+
+func _setup_operatives_modal() -> void:
+	var container = $OperativesModal/Margin/VBox/OperativesContainer
+	for c in container.get_children():
+		c.queue_free()
+
+	for op_id in SaveManagerClass.operative_defs.keys():
+		var op = SaveManagerClass.operative_defs[op_id]
+		var is_selected = (SaveManagerClass.selected_operative == op_id)
+
+		var card = PanelContainer.new()
+		card.custom_minimum_size = Vector2(220, 315)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		var border_col = op.color if is_selected else Color(0.2, 0.4, 0.6, 0.8)
+		var bg_col = Color(0.06, 0.10, 0.18, 0.96) if not is_selected else Color(0.08, 0.15, 0.25, 0.98)
+		var style = StyleBoxFlat.new()
+		style.bg_color = bg_col
+		style.border_color = border_col
+		style.set_border_width_all(3 if is_selected else 1)
+		style.set_corner_radius_all(8)
+		if is_selected:
+			style.shadow_color = Color(op.color.r * 0.3, op.color.g * 0.3, op.color.b * 0.3, 0.6)
+			style.shadow_size = 10
+		card.add_theme_stylebox_override("panel", style)
+
+		var margin = MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 12)
+		margin.add_theme_constant_override("margin_right", 12)
+		margin.add_theme_constant_override("margin_top", 14)
+		margin.add_theme_constant_override("margin_bottom", 14)
+		card.add_child(margin)
+
+		var vb = VBoxContainer.new()
+		vb.add_theme_constant_override("separation", 6)
+		margin.add_child(vb)
+
+		var name_lbl = Label.new()
+		name_lbl.text = op.name
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.add_theme_font_size_override("font_size", 14)
+		name_lbl.add_theme_color_override("font_color", op.color)
+		vb.add_child(name_lbl)
+
+		var title_lbl = Label.new()
+		title_lbl.text = "[ %s ]" % op.title
+		title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title_lbl.add_theme_font_size_override("font_size", 11)
+		title_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2, 0.9))
+		vb.add_child(title_lbl)
+
+		var avatar_rect = TextureRect.new()
+		avatar_rect.texture = SpriteFactory.create_operative_avatar(op_id)
+		avatar_rect.custom_minimum_size = Vector2(52, 52)
+		avatar_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		avatar_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		vb.add_child(avatar_rect)
+
+		var w_lbl = Label.new()
+		w_lbl.text = "⚔️ Khởi đầu: %s" % op.weapon
+		w_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		w_lbl.add_theme_font_size_override("font_size", 11)
+		w_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0, 0.95))
+		vb.add_child(w_lbl)
+
+		var desc_lbl = Label.new()
+		desc_lbl.text = op.desc
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desc_lbl.add_theme_font_size_override("font_size", 11)
+		desc_lbl.add_theme_color_override("font_color", Color(0.85, 0.9, 0.98, 0.85))
+		desc_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		vb.add_child(desc_lbl)
+
+		var select_btn = Button.new()
+		select_btn.custom_minimum_size = Vector2(180, 36)
+		select_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		if is_selected:
+			select_btn.text = "✔ ĐANG CHỌN"
+			select_btn.disabled = true
+		else:
+			select_btn.text = "CHỌN CHIẾN BINH"
+			select_btn.pressed.connect(func():
+				if sound_mgr and sound_mgr.has_method("play_ui_click"):
+					sound_mgr.play_ui_click()
+				SaveManagerClass.selected_operative = op_id
+				SaveManagerClass.save_game()
+				_update_stats_display()
+				_setup_operatives_modal()
+			)
+		vb.add_child(select_btn)
+
+		container.add_child(card)
+
+func _setup_armory_modal() -> void:
+	var balance_lbl = $ArmoryModal/Margin/VBox/NaniteBalanceLabel as Label
+	if balance_lbl:
+		balance_lbl.text = "💎 NANITE CORES KHẢ DỤNG: %d" % SaveManagerClass.nanites
+
+	var grid = $ArmoryModal/Margin/VBox/Scroll/Grid
+	for c in grid.get_children():
+		c.queue_free()
+
+	for up_id in SaveManagerClass.upgrade_defs.keys():
+		var def = SaveManagerClass.upgrade_defs[up_id]
+		var cur_lvl = SaveManagerClass.meta_upgrades.get(up_id, 0)
+		var max_lvl = SaveManagerClass.max_upgrade_levels.get(up_id, 5)
+		var cost = SaveManagerClass.get_upgrade_cost(up_id)
+		var is_max = (cur_lvl >= max_lvl)
+
+		var card = PanelContainer.new()
+		card.custom_minimum_size = Vector2(440, 78)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.06, 0.10, 0.18, 0.9)
+		style.border_color = Color(0.2, 0.5, 0.8, 0.7)
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(6)
+		card.add_theme_stylebox_override("panel", style)
+
+		var margin = MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 12)
+		margin.add_theme_constant_override("margin_right", 12)
+		margin.add_theme_constant_override("margin_top", 8)
+		margin.add_theme_constant_override("margin_bottom", 8)
+		card.add_child(margin)
+
+		var hbox = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 12)
+		margin.add_child(hbox)
+
+		# Text Column
+		var vb = VBoxContainer.new()
+		vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		vb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		vb.add_theme_constant_override("separation", 3)
+
+		var top_row = HBoxContainer.new()
+		top_row.add_theme_constant_override("separation", 10)
+
+		var name_lbl = Label.new()
+		name_lbl.text = def.name
+		name_lbl.add_theme_font_size_override("font_size", 13)
+		name_lbl.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0))
+		top_row.add_child(name_lbl)
+
+		var lvl_lbl = Label.new()
+		var stars = ""
+		for i in range(max_lvl):
+			stars += "★" if i < cur_lvl else "☆"
+		lvl_lbl.text = "[%s]" % stars
+		lvl_lbl.add_theme_font_size_override("font_size", 11)
+		lvl_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25))
+		top_row.add_child(lvl_lbl)
+		vb.add_child(top_row)
+
+		var desc_lbl = Label.new()
+		desc_lbl.text = "%s (%s)" % [def.desc, def.unit]
+		desc_lbl.add_theme_font_size_override("font_size", 11)
+		desc_lbl.add_theme_color_override("font_color", Color(0.8, 0.88, 0.96, 0.8))
+		vb.add_child(desc_lbl)
+		hbox.add_child(vb)
+
+		# Buy button
+		var buy_btn = Button.new()
+		buy_btn.custom_minimum_size = Vector2(130, 38)
+		buy_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		if is_max:
+			buy_btn.text = "MAX CẤP 👑"
+			buy_btn.disabled = true
+		else:
+			buy_btn.text = "%d 💎" % cost
+			buy_btn.disabled = (SaveManagerClass.nanites < cost)
+			buy_btn.pressed.connect(func():
+				if SaveManagerClass.buy_upgrade(up_id):
+					if sound_mgr and sound_mgr.has_method("play_ui_click"):
+						sound_mgr.play_ui_click()
+					_update_stats_display()
+					_setup_armory_modal()
+			)
+		hbox.add_child(buy_btn)
+
+		grid.add_child(card)

@@ -15,6 +15,8 @@ var particle_mgr: Node2D = null
 var blade_trails: Array = []
 const TRAIL_LENGTH: int = 8
 
+var player_ref: CharacterBody2D = null
+
 func _ready() -> void:
 	_get_managers()
 	_init_trails()
@@ -25,6 +27,7 @@ func _get_managers() -> void:
 		swarm_mgr = cur.get_node_or_null("SwarmManager")
 		sound_mgr = cur.get_node_or_null("SoundManager")
 		particle_mgr = cur.get_node_or_null("ParticleManager")
+		player_ref = cur.get_node_or_null("Entities/Player")
 
 func _init_trails() -> void:
 	blade_trails.clear()
@@ -36,10 +39,10 @@ var is_evolved: bool = false
 
 func evolve_vortex() -> void:
 	is_evolved = true
-	blade_count = 4
-	damage = 65.0
-	orbit_radius = 120.0
-	rotation_speed = 6.0
+	blade_count = 6
+	damage = 75.0
+	orbit_radius = 125.0
+	rotation_speed = 7.0
 	_init_trails()
 
 func upgrade_blade() -> void:
@@ -55,10 +58,12 @@ func upgrade_speed(multiplier: float) -> void:
 	rotation_speed *= multiplier
 
 func _physics_process(delta: float) -> void:
-	if not swarm_mgr:
+	if not swarm_mgr or not player_ref:
 		_get_managers()
 
-	current_angle += rotation_speed * delta
+	var cd_mult = player_ref.cooldown_reduction if (player_ref and "cooldown_reduction" in player_ref) else 0.0
+	var speed_factor = 1.0 + (cd_mult * 0.5)
+	current_angle += rotation_speed * speed_factor * delta
 	if current_angle > TAU:
 		current_angle -= TAU
 
@@ -67,7 +72,19 @@ func _physics_process(delta: float) -> void:
 		blade_trails.append([])
 
 	var hit_this_frame = false
+	var total_dealt = 0.0
 
+	var crit_info = player_ref.roll_crit(damage) if (player_ref and player_ref.has_method("roll_crit")) else {"damage": damage, "is_crit": false}
+	var hit_damage = float(crit_info["damage"]) * delta * 4.0
+
+	# 1. Inner contact sweep: Eliminate 94px deadzone for enemies touching player
+	if swarm_mgr and swarm_mgr.active_count > 0:
+		var inner_hits = swarm_mgr.damage_in_radius(global_position + Vector2(0, -14), 48.0, hit_damage * 0.65, knockback_force * 0.5)
+		if inner_hits > 0:
+			hit_this_frame = true
+			total_dealt += hit_damage * 0.65 * inner_hits
+
+	# 2. Orbital Scythe blades
 	for i in range(blade_count):
 		var angle_offset = (TAU / float(blade_count)) * float(i)
 		var angle = current_angle + angle_offset
@@ -86,11 +103,15 @@ func _physics_process(delta: float) -> void:
 		# Hit-check against swarm
 		if swarm_mgr and swarm_mgr.active_count > 0:
 			var world_blade = global_position + blade_pos
-			var hits = swarm_mgr.damage_in_radius(world_blade, 26.0, damage * delta * 4.0, knockback_force)
+			var hits = swarm_mgr.damage_in_radius(world_blade, 28.0, hit_damage, knockback_force)
 			if hits > 0:
 				hit_this_frame = true
+				total_dealt += hit_damage * hits
 				if particle_mgr and randf() < 0.35:
 					particle_mgr.spawn_sparks(world_blade, Color(0.4, 2.5, 3.5, 1.0), 3)
+
+	if total_dealt > 0.0 and player_ref and player_ref.has_method("record_weapon_damage"):
+		player_ref.record_weapon_damage("blade", total_dealt)
 
 	if hit_this_frame and sound_mgr and randf() < 0.2:
 		sound_mgr.play_scythe_slice()

@@ -1,8 +1,16 @@
 extends CanvasLayer
 
 const SpriteFactory = preload("res://scripts/sprite_factory.gd")
+const SaveManagerClass = preload("res://scripts/save_manager.gd")
 
 signal upgrade_selected(upgrade_id: String)
+
+var rerolls_left: int = 1
+var banishes_left: int = 1
+var banished_upgrades: Array[String] = []
+var current_level_picks: Array[Dictionary] = []
+var tactical_row: HBoxContainer = null
+var debrief_damage_box: VBoxContainer = null
 
 @onready var xp_bar: ProgressBar = $TopBar/XPBar
 @onready var level_label: Label = $TopBar/LevelLabel
@@ -81,6 +89,11 @@ var health_chassis_shake_frames: int = 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	SaveManagerClass.init_and_load()
+	rerolls_left = 1 + int(SaveManagerClass.get_bonus("rerolls"))
+	banishes_left = 1 + int(SaveManagerClass.get_bonus("banishes"))
+	banished_upgrades.clear()
+
 	level_up_panel.hide()
 	if level_up_dimming: level_up_dimming.hide()
 	game_over_panel.hide()
@@ -185,7 +198,7 @@ func _setup_hud_styling() -> void:
 	if game_over_panel:
 		var go_tex = SpriteFactory.create_industrial_crt_frame(Color(1.0, 0.2, 0.3, 0.95), Color(0.12, 0.04, 0.06, 0.98))
 		game_over_panel.add_theme_stylebox_override("panel", SpriteFactory.create_pixel_stylebox(go_tex, 8))
-		_style_industrial_btn(game_over_panel.get_node_or_null("VBox/ButtonsRow/RetryButton"), Color(1.0, 0.3, 0.3), Color(0.16, 0.04, 0.06, 0.95))
+		_style_industrial_btn(game_over_panel.get_node_or_null("VBox/ButtonsRow/RestartButton"), Color(1.0, 0.3, 0.3), Color(0.16, 0.04, 0.06, 0.95))
 		_style_industrial_btn(game_over_panel.get_node_or_null("VBox/ButtonsRow/MenuButton"), Color(0.4, 0.7, 1.0), Color(0.06, 0.10, 0.18, 0.95))
 	if chest_modal:
 		var ch_modal_tex = SpriteFactory.create_industrial_crt_frame(Color(1.0, 0.85, 0.25, 0.95), Color(0.14, 0.08, 0.02, 0.98))
@@ -262,27 +275,36 @@ func update_combo(count: int) -> void:
 	if not combo_badge:
 		_create_combo_elements()
 
-	if count < 5:
+	if count < 2:
 		combo_badge.hide()
 		return
 
 	combo_badge.show()
-	combo_scale = 1.32
+	combo_scale = 1.38
 
-	var col = Color(0.3, 0.9, 1.0, 1.0)
+	var col = Color(0.4, 0.8, 1.0, 1.0)
 	var prefix = "⚡"
 	if count >= 250:
 		col = Color(1.0, 0.2, 0.6, 1.0)
 		prefix = "👑"
 	elif count >= 100:
-		col = Color(1.0, 0.3, 0.2, 1.0)
-		prefix = "💀"
+		col = Color(1.0, 0.25, 0.2, 1.0)
+		prefix = "☣️"
+	elif count >= 75:
+		col = Color(1.0, 0.5, 0.1, 1.0)
+		prefix = "👑"
 	elif count >= 50:
-		col = Color(1.0, 0.8, 0.2, 1.0)
-		prefix = "💥"
+		col = Color(1.0, 0.85, 0.2, 1.0)
+		prefix = "💀"
 	elif count >= 25:
 		col = Color(0.2, 1.0, 0.5, 1.0)
+		prefix = "💥"
+	elif count >= 10:
+		col = Color(0.3, 0.9, 1.0, 1.0)
 		prefix = "🔥"
+	elif count >= 5:
+		col = Color(0.4, 0.8, 1.0, 1.0)
+		prefix = "⚡"
 
 	combo_label.text = "%s x%d COMBO!" % [prefix, count]
 	combo_label.add_theme_color_override("font_color", col)
@@ -313,7 +335,7 @@ func _process(delta: float) -> void:
 
 	if milestone_timer > 0.0:
 		milestone_timer -= delta
-		var pulse = (int(Time.get_ticks_msec() / 90) % 2) * 0.3 + 0.7
+		var pulse = (int(float(Time.get_ticks_msec()) / 90.0) % 2) * 0.3 + 0.7
 		milestone_banner.modulate = Color(1.0, 1.0, 1.0, pulse)
 		if milestone_timer <= 0.0:
 			milestone_banner.hide()
@@ -331,14 +353,14 @@ func _process(delta: float) -> void:
 
 	if surge_banner_timer > 0.0:
 		surge_banner_timer -= delta
-		var pulse = (int(Time.get_ticks_msec() / 150) % 2) * 0.35 + 0.65
+		var pulse = (int(float(Time.get_ticks_msec()) / 150.0) % 2) * 0.35 + 0.65
 		surge_banner.modulate = Color(1.0, 1.0, 1.0, pulse)
 		if surge_banner_timer <= 0.0:
 			surge_banner.hide()
 
 	if not get_tree().paused:
 		survival_seconds += delta
-		var mins = int(survival_seconds) / 60
+		var mins = int(survival_seconds / 60.0)
 		var secs = int(survival_seconds) % 60
 		timer_label.text = "%02d:%02d" % [mins, secs]
 		fps_label.text = "%d FPS" % Engine.get_frames_per_second()
@@ -355,7 +377,7 @@ func _process(delta: float) -> void:
 
 		# Reactor pod heart pulsation
 		if heart_icon:
-			var beat = (int(Time.get_ticks_msec() / 250) % 2)
+			var beat = (int(float(Time.get_ticks_msec()) / 250.0) % 2)
 			heart_icon.modulate = Color(1.4, 0.5, 0.6, 1.0) if beat == 1 else Color(1.0, 0.25, 0.4, 1.0)
 
 		# Pixel segmented health bar & ghost trail
@@ -382,17 +404,20 @@ func _process(delta: float) -> void:
 			boss_hp_bar.value = round(lerp(float(boss_hp_bar.value), target_boss_hp, 10.0 * delta))
 		radar_rect.queue_redraw()
 
+var current_boss_name: String = "APEX LEVIATHAN"
+
 func show_boss_bar(b_name: String, cur_hp: float, maximum: float) -> void:
+	current_boss_name = b_name
 	max_boss_hp = maximum
 	target_boss_hp = cur_hp
 	boss_hp_bar.max_value = maximum
 	boss_hp_bar.value = cur_hp
-	boss_label.text = "%s - %d / %d HP" % [b_name, int(cur_hp), int(maximum)]
+	boss_label.text = "%s - %d / %d HP" % [current_boss_name, int(cur_hp), int(maximum)]
 	boss_container.show()
 
 func update_boss_health(cur_hp: float, maximum: float) -> void:
 	target_boss_hp = cur_hp
-	boss_label.text = "APEX LEVIATHAN - %d / %d HP" % [int(cur_hp), int(maximum)]
+	boss_label.text = "%s - %d / %d HP" % [current_boss_name, int(cur_hp), int(maximum)]
 
 func hide_boss_bar() -> void:
 	if boss_container:
@@ -594,11 +619,18 @@ func show_level_up(lvl: int) -> void:
 	if sound_mgr and sound_mgr.has_method("play_levelup"):
 		sound_mgr.play_levelup()
 
-	for child in card_container.get_children():
-		child.queue_free()
-
 	if not player_node:
 		player_node = get_tree().get_first_node_in_group("player")
+
+	_populate_level_cards(lvl, false)
+
+	if level_up_dimming:
+		level_up_dimming.show()
+	level_up_panel.show()
+
+func _populate_level_cards(lvl: int, is_banish_mode: bool = false) -> void:
+	for child in card_container.get_children():
+		child.queue_free()
 
 	var available = _build_available_upgrades()
 	available.shuffle()
@@ -616,15 +648,71 @@ func show_level_up(lvl: int) -> void:
 		if not picks.has(item):
 			picks.append(item)
 
+	current_level_picks = picks
+
 	for item in picks:
-		var card = _create_hologram_card(item)
+		var card = _create_hologram_card(item, is_banish_mode, lvl)
 		card_container.add_child(card)
 
-	if level_up_dimming:
-		level_up_dimming.show()
-	level_up_panel.show()
+	_setup_tactical_row(lvl, is_banish_mode)
 
-func _create_hologram_card(item: Dictionary) -> PanelContainer:
+func _setup_tactical_row(lvl: int, is_banish_mode: bool) -> void:
+	if not tactical_row:
+		tactical_row = HBoxContainer.new()
+		tactical_row.name = "TacticalRow"
+		tactical_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		tactical_row.add_theme_constant_override("separation", 24)
+		$LevelUpModal/VBox.add_child(tactical_row)
+
+	for c in tactical_row.get_children():
+		c.queue_free()
+
+	# 1. Reroll Button
+	var btn_reroll = Button.new()
+	btn_reroll.custom_minimum_size = Vector2(210, 42)
+	btn_reroll.text = "🎲 ĐỔI THẺ (Còn %d)" % rerolls_left
+	btn_reroll.disabled = (rerolls_left <= 0 or is_banish_mode)
+	_style_industrial_btn(btn_reroll, Color(0.2, 0.85, 1.0), Color(0.04, 0.08, 0.16))
+	btn_reroll.pressed.connect(func():
+		if rerolls_left > 0:
+			rerolls_left -= 1
+			if sound_mgr and sound_mgr.has_method("play_ui_click"):
+				sound_mgr.play_ui_click()
+			_populate_level_cards(lvl, false)
+	)
+	tactical_row.add_child(btn_reroll)
+
+	# 2. Banish Button
+	var btn_banish = Button.new()
+	btn_banish.custom_minimum_size = Vector2(210, 42)
+	btn_banish.text = "◀ QUAY LẠI CHỌN" if is_banish_mode else ("🚫 TẨY TRỪ (Còn %d)" % banishes_left)
+	btn_banish.disabled = (banishes_left <= 0 and not is_banish_mode)
+	var banish_col = Color(1.0, 0.6, 0.2) if is_banish_mode else Color(1.0, 0.3, 0.35)
+	_style_industrial_btn(btn_banish, banish_col, Color(0.14, 0.04, 0.06))
+	btn_banish.pressed.connect(func():
+		if sound_mgr and sound_mgr.has_method("play_ui_click"):
+			sound_mgr.play_ui_click()
+		_populate_level_cards(lvl, not is_banish_mode)
+	)
+	tactical_row.add_child(btn_banish)
+
+	# 3. Skip Button
+	var btn_skip = Button.new()
+	btn_skip.custom_minimum_size = Vector2(210, 42)
+	btn_skip.text = "⏩ BỎ QUA (+50 NANITES)"
+	_style_industrial_btn(btn_skip, Color(1.0, 0.85, 0.25), Color(0.14, 0.10, 0.03))
+	btn_skip.pressed.connect(func():
+		if sound_mgr and sound_mgr.has_method("play_ui_click"):
+			sound_mgr.play_ui_click()
+		SaveManagerClass.add_nanites(50)
+		level_up_panel.hide()
+		if level_up_dimming:
+			level_up_dimming.hide()
+		get_tree().paused = false
+	)
+	tactical_row.add_child(btn_skip)
+
+func _create_hologram_card(item: Dictionary, is_banish_mode: bool = false, current_lvl: int = 1) -> PanelContainer:
 	var card = PanelContainer.new()
 	card.custom_minimum_size = Vector2(290, 380)
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -636,26 +724,29 @@ func _create_hologram_card(item: Dictionary) -> PanelContainer:
 
 	var glow_col = Color(0.25, 0.85, 1.0, 1.0)
 	var cat_name = "[ VŨ KHÍ MỚI ]"
-	var border_w = 2
 	var bg_col = Color(0.04, 0.08, 0.16, 0.96)
 
-	match item.rarity:
-		"evo":
-			bg_col = Color(0.16, 0.05, 0.14, 0.97)
-			glow_col = Color(1.0, 0.28, 0.65, 1.0)
-			cat_name = "👑 TIẾN HÓA TỐI THƯỢNG"
-			border_w = 3
-		"passive":
-			bg_col = Color(0.03, 0.12, 0.07, 0.96)
-			glow_col = Color(0.25, 1.0, 0.55, 1.0)
-			cat_name = "💠 NỘI TẠI CÔNG NGHỆ"
-		_:
-			bg_col = Color(0.04, 0.09, 0.18, 0.96)
-			glow_col = Color(0.25, 0.85, 1.0, 1.0)
-			if item.get("is_new", false):
-				cat_name = "✨ VŨ KHÍ MỚI"
-			else:
-				cat_name = "⚡ CƯỜNG HÓA VŨ KHÍ"
+	if is_banish_mode:
+		bg_col = Color(0.18, 0.03, 0.05, 0.97)
+		glow_col = Color(1.0, 0.25, 0.3, 1.0)
+		cat_name = "🚫 CHỌN ĐỂ LOẠI BỎ KHỎI RUN"
+	else:
+		match item.rarity:
+			"evo":
+				bg_col = Color(0.16, 0.05, 0.14, 0.97)
+				glow_col = Color(1.0, 0.28, 0.65, 1.0)
+				cat_name = "👑 TIẾN HÓA TỐI THƯỢNG"
+			"passive":
+				bg_col = Color(0.03, 0.12, 0.07, 0.96)
+				glow_col = Color(0.25, 1.0, 0.55, 1.0)
+				cat_name = "💠 NỘI TẠI CÔNG NGHỆ"
+			_:
+				bg_col = Color(0.04, 0.09, 0.18, 0.96)
+				glow_col = Color(0.25, 0.85, 1.0, 1.0)
+				if item.get("is_new", false):
+					cat_name = "✨ VŨ KHÍ MỚI"
+				else:
+					cat_name = "⚡ CƯỜNG HÓA VŨ KHÍ"
 
 	var card_tex_normal = SpriteFactory.create_industrial_crt_frame(glow_col, bg_col)
 	var card_tex_hover = SpriteFactory.create_industrial_crt_frame(Color(1.0, 1.0, 1.0, 1.0), bg_col.lightened(0.06))
@@ -771,20 +862,31 @@ func _create_hologram_card(item: Dictionary) -> PanelContainer:
 	var btn_action = Button.new()
 	btn_action.custom_minimum_size = Vector2(250, 42)
 	btn_action.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	btn_action.text = "👑 TIẾN HÓA NGAY ▶" if item.rarity == "evo" else "⚡ BÚ NÂNG CẤP NÀY ▶"
+	if is_banish_mode:
+		btn_action.text = "🚫 XÓA VĨNH VIỄN KHỎI RUN"
+		_style_industrial_btn(btn_action, Color(1.0, 0.3, 0.3), Color(0.18, 0.04, 0.04, 0.98))
+	else:
+		btn_action.text = "👑 TIẾN HÓA NGAY ▶" if item.rarity == "evo" else "⚡ BÚ NÂNG CẤP NÀY ▶"
+		_style_industrial_btn(btn_action, glow_col, Color(0.06, 0.12, 0.22, 0.95))
 	btn_action.add_theme_font_size_override("font_size", 13)
 	btn_action.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-
-	_style_industrial_btn(btn_action, glow_col, Color(0.06, 0.12, 0.22, 0.95))
 
 	vbox.add_child(btn_action)
 
 	# Event Wiring
 	var up_id = item.id
 	var on_select = func():
-		if sound_mgr and sound_mgr.has_method("play_ui_click"):
-			sound_mgr.play_ui_click()
-		_choose_upgrade(up_id)
+		if is_banish_mode:
+			if banishes_left > 0:
+				banished_upgrades.append(up_id)
+				banishes_left -= 1
+				if sound_mgr and sound_mgr.has_method("play_ui_click"):
+					sound_mgr.play_ui_click()
+				_populate_level_cards(current_lvl, false)
+		else:
+			if sound_mgr and sound_mgr.has_method("play_ui_click"):
+				sound_mgr.play_ui_click()
+			_choose_upgrade(up_id)
 
 	btn_action.pressed.connect(on_select)
 	card.gui_input.connect(func(event: InputEvent):
@@ -857,8 +959,8 @@ func _build_available_upgrades() -> Array[Dictionary]:
 		list.append({
 			"id": "blade_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
 			"title": "🌀 OMNI-SCYTHE VORTEX",
-			"desc": "4 lưỡi hái năng lượng khổng lồ bọc kín không gian xung quanh!",
-			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • 4 LƯỠI HÁI OMNI", "is_new": false
+			"desc": "6 lưỡi hái năng lượng khổng lồ bọc kín không gian xung quanh!",
+			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • 6 LƯỠI HÁI OMNI", "is_new": false
 		})
 	if w_lv.has("tesla") and w_lv["tesla"] >= 5 and p_lv["energy_core"] >= 1 and not evo["tesla"]:
 		list.append({
@@ -871,12 +973,18 @@ func _build_available_upgrades() -> Array[Dictionary]:
 		list.append({
 			"id": "mortar_evo", "rarity": "evo", "stars": "👑 TIẾN HÓA TỐI THƯỢNG",
 			"title": "☣️ CORROSIVE CHERNOBYL",
-			"desc": "Bắn 4 pháo cối phóng xạ tạo biển axít hủy diệt làm tan chảy mọi quái vật!",
-			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • 4 PHÁO CỐI BIỂN AXÍT", "is_new": false
+			"desc": "Bắn 3 pháo cối phóng xạ tạo biển axít hủy diệt làm tan chảy mọi quái vật!",
+			"lvl": 5, "stat_bonus": "MAX TIẾN HÓA • 3 PHÁO CỐI BIỂN AXÍT", "is_new": false
 		})
 
 	# 2. Weapons Unlocks & Upgrades
-	if w_lv["railgun"] < 5 and not evo["railgun"]:
+	if w_lv["railgun"] == 0:
+		list.append({
+			"id": "railgun", "rarity": "weapon", "stars": "✨ VŨ KHÍ MỚI",
+			"title": "⚡ SÚNG LASER RAILGUN", "desc": "Mở khóa chùm laser cao tần xuyên thủng hàng loạt quái vật theo đường thẳng.",
+			"lvl": 0, "stat_bonus": "MỞ KHÓA VŨ KHÍ MỚI", "is_new": true
+		})
+	elif w_lv["railgun"] < 5 and not evo["railgun"]:
 		var r_lvl = w_lv["railgun"]
 		list.append({
 			"id": "railgun", "rarity": "weapon", "stars": _get_stars(r_lvl),
@@ -1007,7 +1115,11 @@ func _build_available_upgrades() -> Array[Dictionary]:
 			"lvl": ap_lvl, "stat_bonus": "+20% TỔNG SÁT THƯƠNG", "is_new": ap_lvl == 0
 		})
 
-	return list
+	var filtered: Array[Dictionary] = []
+	for it in list:
+		if not banished_upgrades.has(it.id):
+			filtered.append(it)
+	return filtered
 
 func _get_stars(lvl: int) -> String:
 	var s = ""
@@ -1023,13 +1135,125 @@ func _choose_upgrade(upgrade_id: String) -> void:
 	upgrade_selected.emit(upgrade_id)
 	call_deferred("update_inventory")
 
-func show_game_over(level: int) -> void:
+func show_game_over(level: int, time_survived: float = 0.0, total_kills_count: int = 0) -> void:
 	get_tree().paused = true
+	if time_survived > 0.0:
+		survival_seconds = time_survived
+	if total_kills_count > 0:
+		kills = total_kills_count
+
 	if sound_mgr and sound_mgr.has_method("play_ui_back"):
 		sound_mgr.play_ui_back()
-	var mins = int(survival_seconds) / 60
+
+	SaveManagerClass.init_and_load()
+	var base_nanites = int(survival_seconds * 0.75 + float(kills) * 0.25)
+	var prev_best = SaveManagerClass.best_time
+	SaveManagerClass.add_nanites(base_nanites)
+	var run_nanites = int(float(base_nanites) * (1.0 + SaveManagerClass.get_bonus("nanite_gain")))
+	SaveManagerClass.record_run_stats(survival_seconds, kills)
+	var is_new_record = survival_seconds > prev_best and prev_best > 0.0
+
+	var is_win = survival_seconds >= 900.0
+	var title_lbl = game_over_panel.get_node_or_null("VBox/Title") as Label
+	if title_lbl:
+		if is_win:
+			title_lbl.text = "🏆 CHIẾN THẮNG HUY HOÀNG - TÁC CHIẾN HOÀN TẤT! 🏆"
+			title_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2, 1.0))
+		else:
+			title_lbl.text = "☠️ TỬ TRẬN TRONG DANH DỰ • KẾT THÚC CHIẾN DỊCH ☠️"
+			title_lbl.add_theme_color_override("font_color", Color(1.0, 0.28, 0.35, 1.0))
+
+	var mins = int(survival_seconds / 60.0)
 	var secs = int(survival_seconds) % 60
-	game_over_stats.text = "⏱️ THỜI GIAN SINH TỒN: %02d:%02d\n⭐ CẤP ĐỘ ĐẠT ĐƯỢC: LVL %d\n💀 QUÁI VẬT TIÊU DIỆT: %d CON" % [mins, secs, level, kills]
+	var op_info = SaveManagerClass.operative_defs.get(SaveManagerClass.selected_operative, {})
+	var op_name = op_info.get("name", "VEX")
+
+	var record_str = " 🔥 [KỶ LỤC MỚI!]" if is_new_record else ""
+	game_over_stats.text = "CHIẾN BINH: %s\n⏱️ THỜI GIAN SINH TỒN: %02d:%02d%s    |    ⭐ CẤP ĐỘ ĐẠT ĐƯỢC: LVL %d\n💀 TIÊU DIỆT BẦY QUÁI: %d CON    |    💎 NANITES THU ĐƯỢC: +%d (TỔNG: %d)" % [
+		op_name, mins, secs, record_str, level, kills, run_nanites, SaveManagerClass.nanites
+	]
+
+	# Build weapon damage breakdown
+	if not debrief_damage_box:
+		debrief_damage_box = VBoxContainer.new()
+		debrief_damage_box.name = "DebriefDamageBox"
+		debrief_damage_box.add_theme_constant_override("separation", 6)
+		var vbox = $GameOverModal/VBox
+		var btn_row = $GameOverModal/VBox/ButtonsRow
+		vbox.add_child(debrief_damage_box)
+		vbox.move_child(debrief_damage_box, btn_row.get_index())
+
+	for c in debrief_damage_box.get_children():
+		c.queue_free()
+
+	var dmg_header = Label.new()
+	dmg_header.text = "--- HIỆU SUẤT SÁT THƯƠNG KHO VŨ KHÍ ---"
+	dmg_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dmg_header.add_theme_font_size_override("font_size", 13)
+	dmg_header.add_theme_color_override("font_color", Color(0.3, 0.85, 1.0, 1.0))
+	debrief_damage_box.add_child(dmg_header)
+
+	var w_dmg = player_node.get("weapon_damage_dealt") if player_node else {}
+	var total_dmg = 0.0
+	if w_dmg:
+		for d in w_dmg.values():
+			total_dmg += float(d)
+
+	var weapon_names = {
+		"railgun": "⚡ Railgun Laser",
+		"flame": "🔥 Súng Phun Lửa",
+		"shockwave": "💥 Sóng Chấn Động",
+		"missile": "🚀 Tên Lửa Tự Dẫn",
+		"blade": "🌀 Lưỡi Hái Quỹ Đạo",
+		"tesla": "⚡ Cuộn Dây Tesla",
+		"mortar": "☣️ Pháo Cối Axít"
+	}
+
+	if total_dmg > 0:
+		for w_id in w_dmg.keys():
+			var d_val = float(w_dmg[w_id])
+			if d_val <= 0: continue
+			var pct = (d_val / total_dmg) * 100.0
+			var row = HBoxContainer.new()
+			row.add_theme_constant_override("separation", 10)
+
+			var name_lbl = Label.new()
+			name_lbl.custom_minimum_size = Vector2(170, 0)
+			name_lbl.text = weapon_names.get(w_id, w_id.capitalize())
+			name_lbl.add_theme_font_size_override("font_size", 12)
+			row.add_child(name_lbl)
+
+			var bar = ProgressBar.new()
+			bar.custom_minimum_size = Vector2(240, 14)
+			bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			bar.max_value = 100.0
+			bar.value = pct
+			bar.show_percentage = false
+			var bar_style = StyleBoxFlat.new()
+			bar_style.bg_color = Color(0.2, 0.75, 1.0, 0.85)
+			bar_style.set_corner_radius_all(3)
+			bar.add_theme_stylebox_override("fill", bar_style)
+			row.add_child(bar)
+
+			var val_lbl = Label.new()
+			val_lbl.custom_minimum_size = Vector2(160, 0)
+			val_lbl.text = "%d DMG (%.1f%%)" % [int(d_val), pct]
+			val_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			val_lbl.add_theme_font_size_override("font_size", 12)
+			val_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 1.0))
+			row.add_child(val_lbl)
+
+			debrief_damage_box.add_child(row)
+	else:
+		var no_dmg = Label.new()
+		no_dmg.text = "Chưa ghi nhận sát thương vũ khí."
+		no_dmg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		no_dmg.add_theme_font_size_override("font_size", 11)
+		debrief_damage_box.add_child(no_dmg)
+
+	game_over_panel.custom_minimum_size = Vector2(680, 480)
+	game_over_panel.pivot_offset = Vector2(340, 240)
 	game_over_panel.show()
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://main_swarm_ultimate"]
+[gd_scene load_steps=14 format=3 uid="uid://main_swarm_ultimate"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/arena.tscn" id="2_arena"]
@@ -9,15 +9,35 @@
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="7_player"]
 [ext_resource type="Script" path="res://scripts/camera.gd" id="8_cam"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="9_hud"]
+[ext_resource type="Shader" path="res://shaders/post_process.gdshader" id="10_post"]
 
 [sub_resource type="Environment" id="Environment_glow"]
 background_mode = 3
 glow_enabled = true
-glow_intensity = 0.70
+glow_intensity = 0.65
 glow_strength = 0.95
-glow_bloom = 0.10
-glow_blend_mode = 0
-tonemap_mode = 2
+glow_bloom = 0.08
+glow_blend_mode = 1
+glow_hdr_threshold = 1.15
+glow_levels/1 = 0.8
+glow_levels/2 = 0.9
+glow_levels/3 = 1.0
+glow_levels/5 = 0.7
+glow_levels/7 = 0.4
+tonemap_mode = 3
+tonemap_exposure = 1.08
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_post"]
+shader = ExtResource("10_post")
+shader_parameter/shockwave_center = Vector2(0.5, 0.5)
+shader_parameter/shockwave_progress = 0.0
+shader_parameter/shockwave_force = 0.045
+shader_parameter/shockwave_size = 0.12
+shader_parameter/chromatic_aberration_intensity = 0.0
+shader_parameter/damage_vignette_color = Color(0.9, 0.08, 0.08, 1)
+shader_parameter/damage_vignette_intensity = 0.0
+shader_parameter/crt_enabled = true
+shader_parameter/scanline_intensity = 0.02
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -52,4 +72,18 @@ zoom = Vector2(0.9, 0.9)
 position_smoothing_enabled = true
 script = ExtResource("8_cam")
 
+[node name="PostProcessLayer" type="CanvasLayer" parent="."]
+layer = 6
+
+[node name="PostProcessRect" type="ColorRect" parent="PostProcessLayer"]
+material = SubResource("ShaderMaterial_post")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="HUD" parent="." instance=ExtResource("9_hud")]
+layer = 10
+

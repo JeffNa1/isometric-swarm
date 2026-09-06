@@ -262,134 +262,298 @@ static func create_brute_texture() -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
-static func create_player_frames() -> Array[ImageTexture]:
+static func create_spitter_texture() -> ImageTexture:
+	var w = 44
+	var h = 44
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# 1. Ground Shadow
+	for y in range(30, 42):
+		for x in range(8, 36):
+			var dx = (x - 22.0) / 12.0
+			var dy = (y - 36.0) / 4.5
+			var dist = dx * dx + dy * dy
+			if dist <= 1.0:
+				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.45 * (1.0 - dist * 0.4)))
+
+	# 2. Acid Pouch & Bio Carapace
+	for y in range(12, 34):
+		for x in range(10, 34):
+			var dx = (x - 22.0) / 9.0
+			var dy = (y - 23.0) / 8.5
+			var dist = dx * dx + dy * dy
+			if dist <= 1.0:
+				var col = Color(0.12, 0.28, 0.10, 1.0)
+				# Glowing toxic acid sac in abdomen
+				if dy > 0.0 and dist < 0.7:
+					col = Color(0.4, 2.5, 0.2, 0.95)
+				elif dy < -0.2:
+					col = Color(0.2, 0.45, 0.15, 1.0)
+				img.set_pixel(x, y, col)
+
+	# 3. Venom Glands & Eyes
+	img.set_pixel(20, 14, Color(3.5, 3.0, 0.4, 1.0))
+	img.set_pixel(24, 14, Color(3.5, 3.0, 0.4, 1.0))
+	img.set_pixel(22, 12, Color(2.0, 3.5, 0.5, 1.0))
+
+	return ImageTexture.create_from_image(img)
+
+
+static func create_exploder_texture() -> ImageTexture:
+	var w = 36
+	var h = 36
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# 1. Ground Shadow
+	for y in range(24, 34):
+		for x in range(8, 28):
+			var dx = (x - 18.0) / 9.0
+			var dy = (y - 29.0) / 3.5
+			var dist = dx * dx + dy * dy
+			if dist <= 1.0:
+				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.45 * (1.0 - dist * 0.4)))
+
+	# 2. Spherical Pulsating Bomb Body
+	for y in range(8, 28):
+		for x in range(8, 28):
+			var dx = (x - 18.0) / 8.5
+			var dy = (y - 18.0) / 8.5
+			var dist = dx * dx + dy * dy
+			if dist <= 1.0:
+				var col = Color(1.8, 0.8, 0.05, 1.0)
+				# Incandescent glowing core
+				if dist < 0.45:
+					col = Color(3.8, 3.2, 0.5, 1.0)
+				elif dist > 0.8:
+					col = Color(0.35, 0.12, 0.02, 1.0)
+				img.set_pixel(x, y, col)
+
+	# 3. Hazard Chevron Markings
+	for i in range(4):
+		img.set_pixel(16 + i, 16 + i, Color(0.1, 0.05, 0.0, 1.0))
+		img.set_pixel(20 - i, 16 + i, Color(0.1, 0.05, 0.0, 1.0))
+
+	return ImageTexture.create_from_image(img)
+
+
+static func create_player_frames(op_id: String = "vex") -> Array[ImageTexture]:
+	return create_operative_frames(op_id)
+
+static func create_operative_frames(op_id: String = "vex") -> Array[ImageTexture]:
 	var frames: Array[ImageTexture] = []
 	var w = 48
 	var h = 48
 
-	for frame_idx in range(4):
+	# Bảng màu & đặc điểm riêng cho 4 Lớp Chiến Binh
+	var pal_armor = Color(0.16, 0.23, 0.33)
+	var pal_energy = Color(0.1, 3.2, 4.2) # Cyan Vex
+	var pal_cloth = Color(0.08, 0.10, 0.15)
+	var pal_highlight = Color(0.85, 0.95, 1.0)
+
+	match op_id:
+		"pyro":
+			pal_armor = Color(0.45, 0.20, 0.06)
+			pal_energy = Color(3.5, 1.3, 0.15) # Rực Lửa Cam Đỏ
+			pal_cloth = Color(0.14, 0.10, 0.08)
+			pal_highlight = Color(1.0, 0.85, 0.2)
+		"volt":
+			pal_armor = Color(0.32, 0.38, 0.46)
+			pal_energy = Color(3.8, 3.2, 0.4) # Hồ Quang Vàng Chanh
+			pal_cloth = Color(0.14, 0.12, 0.20)
+			pal_highlight = Color(2.4, 1.3, 3.8) # Sét Tím
+		"colossus":
+			pal_armor = Color(0.10, 0.15, 0.18)
+			pal_energy = Color(0.2, 3.5, 1.5) # Ngọc Bích Emerald
+			pal_cloth = Color(0.06, 0.08, 0.10)
+			pal_highlight = Color(2.5, 1.8, 0.1) # Hazard Yellow
+		_: # "vex"
+			pal_armor = Color(0.14, 0.22, 0.32)
+			pal_energy = Color(0.1, 3.2, 4.2)
+			pal_cloth = Color(0.05, 0.07, 0.10)
+			pal_highlight = Color(0.85, 0.98, 1.0)
+
+	for frame_idx in range(6):
 		var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
 		img.fill(Color(0, 0, 0, 0))
 
-		var bob_y = -1 if (frame_idx == 1 or frame_idx == 3) else 0
-		var leg_phase = 0
-		if frame_idx == 0: leg_phase = 1
-		elif frame_idx == 2: leg_phase = -1
+		# 6-Frame Kinematics Walk/Run Cycle
+		# 0: Contact (L front), 1: Down (Absorb), 2: Passing, 3: Push-off (Peak), 4: Rev-Contact (R front), 5: Rev-Passing
+		var bob_y = 0
+		var leg_l = Vector2.ZERO
+		var leg_r = Vector2.ZERO
+		var arm_l = 0
+		var arm_r = 0
 
-		# 1. Perfectly Centered Ground Shadow (ellipse centered at 24.0, 41.0)
-		for y in range(37, 46):
-			for x in range(12, 37):
-				var dx = (x - 24.0) / 12.0
-				var dy = (y - 41.0) / 4.0
-				var dist = dx * dx + dy * dy
-				if dist <= 1.0:
-					var alpha = 0.5 * (1.0 - dist * 0.35)
-					img.set_pixel(x, y, Color(0.0, 0.0, 0.0, alpha))
+		match frame_idx:
+			0: # Contact
+				bob_y = 0
+				leg_l = Vector2(-3, 1); leg_r = Vector2(3, -1)
+				arm_l = 2; arm_r = -2
+			1: # Down (Hấp thụ chấn động)
+				bob_y = 1
+				leg_l = Vector2(-2, 2); leg_r = Vector2(2, 0)
+				arm_l = 1; arm_r = -1
+			2: # Passing
+				bob_y = -1
+				leg_l = Vector2(-1, 0); leg_r = Vector2(1, -1)
+				arm_l = 0; arm_r = 0
+			3: # Push-off (Đẩy cao)
+				bob_y = -2
+				leg_l = Vector2(1, -2); leg_r = Vector2(-1, 1)
+				arm_l = -2; arm_r = 2
+			4: # Rev-Contact
+				bob_y = 0
+				leg_l = Vector2(3, -1); leg_r = Vector2(-3, 1)
+				arm_l = -2; arm_r = 2
+			5: # Rev-Passing
+				bob_y = -1
+				leg_l = Vector2(1, -1); leg_r = Vector2(-1, 0)
+				arm_l = 0; arm_r = 0
 
-		# 2. Symmetrical Exo-Boots & Legs
-		var left_leg_x = 19 - (leg_phase * 2)
-		var left_leg_y = 35 + (leg_phase * 1) + bob_y
-		var right_leg_x = 29 + (leg_phase * 2)
-		var right_leg_y = 35 - (leg_phase * 1) + bob_y
+		var torso_y = 19 + bob_y
+		var torso_w_mod = 2 if op_id == "colossus" else 0
 
-		for by in range(left_leg_y, left_leg_y + 4):
-			for bx in range(left_leg_x - 2, left_leg_x + 3):
+		# 1. Chân và Ủng Cơ Khí (Độc lập, không chứa bóng sàn)
+		var lx = int(19 + leg_l.x)
+		var ly = int(35 + leg_l.y)
+		var rx = int(28 + leg_r.x)
+		var ry = int(35 + leg_r.y)
+
+		for by in range(ly, ly + 4):
+			for bx in range(lx - 2, lx + 2):
 				if bx >= 0 and bx < w and by >= 0 and by < h:
-					var boot_col = Color(0.12, 0.15, 0.22, 1.0)
-					if by == left_leg_y: boot_col = Color(0.25, 0.4, 0.65, 1.0)
-					img.set_pixel(bx, by, boot_col)
+					var b_col = pal_cloth
+					if by == ly: b_col = pal_armor
+					img.set_pixel(bx, by, b_col)
 
-		for by in range(right_leg_y, right_leg_y + 4):
-			for bx in range(right_leg_x - 2, right_leg_x + 3):
+		for by in range(ry, ry + 4):
+			for bx in range(rx - 2, rx + 2):
 				if bx >= 0 and bx < w and by >= 0 and by < h:
-					var boot_col = Color(0.12, 0.15, 0.22, 1.0)
-					if by == right_leg_y: boot_col = Color(0.25, 0.4, 0.65, 1.0)
-					img.set_pixel(bx, by, boot_col)
+					var b_col = pal_cloth
+					if by == ry: b_col = pal_armor
+					img.set_pixel(bx, by, b_col)
 
-		# Symmetrical Heel Thruster Sparks
-		if frame_idx == 0 or frame_idx == 2:
-			var thruster_x = left_leg_x - 2 if leg_phase > 0 else right_leg_x + 2
-			var thruster_y = left_leg_y + 2 if leg_phase > 0 else right_leg_y + 2
-			if thruster_x >= 0 and thruster_x < w and thruster_y >= 0 and thruster_y < h:
-				img.set_pixel(thruster_x, thruster_y, Color(0.4, 2.2, 3.5, 1.0))
+		# Mũi ủng phản quang / tia phản lực khi dẫm/đẩy
+		if frame_idx == 0 or frame_idx == 3:
+			img.set_pixel(lx - 1, ly + 3, pal_energy)
+			img.set_pixel(rx + 1, ry + 3, pal_energy)
 
-		# 3. Twin Heavy Jetpack Exhausts on Backpack
-		var torso_y = 18 + bob_y
-		for ty in range(torso_y - 3, torso_y + 3):
-			for tx in range(17, 20):
-				img.set_pixel(tx, ty, Color(0.18, 0.22, 0.3, 1.0))
-			for tx in range(29, 32):
-				img.set_pixel(tx, ty, Color(0.18, 0.22, 0.3, 1.0))
-		img.set_pixel(18, torso_y - 3, Color(0.3, 2.5, 3.5, 0.9))
-		img.set_pixel(30, torso_y - 3, Color(0.3, 2.5, 3.5, 0.9))
+		# 2. Trang bị sau lưng đặc thù theo Operative
+		match op_id:
+			"pyro": # Cụm Bình Nhiên Liệu Kép Napalm
+				for ty in range(torso_y - 4, torso_y + 6):
+					for tx in [16, 17, 30, 31]:
+						img.set_pixel(tx, ty, Color(0.70, 0.32, 0.04))
+				img.set_pixel(16, torso_y - 5, pal_energy)
+				img.set_pixel(30, torso_y - 5, pal_energy)
+				# Ống dẫn khí nối ra trước
+				img.set_pixel(15, torso_y + 3, Color(0.3, 0.3, 0.3))
+				img.set_pixel(32, torso_y + 3, Color(0.3, 0.3, 0.3))
+			"volt": # Cuộn cảm Tesla phía trên 2 vai
+				img.set_pixel(16, torso_y - 3, pal_energy)
+				img.set_pixel(31, torso_y - 3, pal_energy)
+				img.set_pixel(16, torso_y - 4, Color(4.0, 4.0, 4.0))
+				img.set_pixel(31, torso_y - 4, Color(4.0, 4.0, 4.0))
+				if frame_idx % 2 == 0:
+					img.set_pixel(17, torso_y - 5, pal_energy)
+					img.set_pixel(30, torso_y - 5, pal_energy)
+			"colossus": # Tấm giáp lưng Titan dày cộp
+				for ty in range(torso_y - 3, torso_y + 8):
+					for tx in range(14, 34):
+						img.set_pixel(tx, ty, Color(0.07, 0.10, 0.14))
+				# Sọc hazard cảnh báo lưng
+				img.set_pixel(22, torso_y, pal_highlight)
+				img.set_pixel(25, torso_y, pal_highlight)
+			_: # Vex: Khăn Choàng Nano Plasma tung bay theo quán tính
+				var scarf_drag = -arm_l * 2
+				for sy in range(torso_y - 1, torso_y + 6):
+					var sx = 15 - (sy - torso_y) + scarf_drag
+					if sx >= 0 and sx < w:
+						img.set_pixel(sx, sy, pal_energy * 0.85)
 
-		# 4. Symmetrical Mech Armored Torso
-		for y in range(torso_y, torso_y + 16):
-			for x in range(16, 33):
-				var dx = (x - 24.0) / 8.0
-				var dy = (y - (torso_y + 8)) / 7.5
-				var dist = dx * dx + dy * dy
-				if dist <= 1.0:
-					var lum = 0.20 + (1.0 - dist) * 0.38
-					var col = Color(lum * 0.5, lum * 0.9, lum * 1.5, 1.0)
-					if abs(dx) > 0.75 or dy < -0.7:
-						col = Color(0.45, 0.72, 1.0, 1.0) # Highlight rim
-					elif abs(x - 24) <= 1 and y <= torso_y + 5:
-						col = Color(0.7, 0.9, 1.0, 1.0) # Central armor crest
+		# 3. Thân Áo Giáp (Torso Armor)
+		for y in range(torso_y, torso_y + 15):
+			for x in range(16 - torso_w_mod, 32 + torso_w_mod):
+				var dx = (x - 24.0) / (7.5 + float(torso_w_mod))
+				var dy = (y - (torso_y + 7)) / 7.0
+				if dx * dx + dy * dy <= 1.0:
+					var col = pal_armor
+					if abs(dx) > 0.72:
+						col = col.darkened(0.25)
+					elif abs(x - 24) <= 1:
+						col = pal_highlight
 					img.set_pixel(x, y, col)
 
-		# 5. Symmetrical Heavy Pauldrons (Left: 12..17, Right: 31..36)
-		for py in range(torso_y + 1, torso_y + 7):
-			for px in range(12, 18):
-				var p_col = Color(0.16, 0.32, 0.55, 1.0)
-				if py == torso_y + 1: p_col = Color(0.65, 0.88, 1.0, 1.0)
-				img.set_pixel(px, py, p_col)
-			for px in range(31, 37):
-				var p_col = Color(0.16, 0.32, 0.55, 1.0)
-				if py == torso_y + 1: p_col = Color(0.65, 0.88, 1.0, 1.0)
-				img.set_pixel(px, py, p_col)
+		# Lõi Năng Lượng Ngực (Reactor Core)
+		for cy in range(torso_y + 6, torso_y + 10):
+			for cx in range(22, 27):
+				if abs(cx - 24) + abs(cy - (torso_y + 7)) <= 2:
+					img.set_pixel(cx, cy, pal_energy)
+		img.set_pixel(24, torso_y + 7, Color(3.5, 4.0, 4.5))
 
-		# 6. Symmetrical Arm Gauntlets (Left: 12..15, Right: 33..36)
-		for ay in range(torso_y + 7, torso_y + 14):
-			for ax in range(12, 16):
-				img.set_pixel(ax, ay, Color(0.14, 0.18, 0.25, 1.0))
-			for ax in range(33, 37):
-				img.set_pixel(ax, ay, Color(0.14, 0.18, 0.25, 1.0))
-		img.set_pixel(13, torso_y + 13, Color(0.3, 1.8, 2.8, 1.0))
-		img.set_pixel(35, torso_y + 13, Color(0.3, 1.8, 2.8, 1.0))
+		# 4. Giáp Vai (Pauldrons) & Cánh Tay Đung Đưa
+		var p_size = 4 if op_id == "colossus" else 2
+		# Vai trái
+		for py in range(torso_y, torso_y + p_size + 2):
+			for px in range(12 - torso_w_mod, 16 - torso_w_mod):
+				img.set_pixel(px, py, pal_highlight)
+		# Vai phải
+		for py in range(torso_y, torso_y + p_size + 2):
+			for px in range(32 + torso_w_mod, 36 + torso_w_mod):
+				img.set_pixel(px, py, pal_highlight)
 
-		# 7. Symmetrical Glowing Cyber Reactor Core (Centered at 24.0, torso_y + 8)
-		for cy in range(torso_y + 6, torso_y + 11):
-			for cx in range(21, 28):
-				var r_dist = abs(cx - 24) + abs(cy - (torso_y + 8))
-				if r_dist <= 2:
-					img.set_pixel(cx, cy, Color(0.25, 2.6, 3.6, 1.0))
-		img.set_pixel(24, torso_y + 8, Color(2.5, 4.0, 4.5, 1.0))
+		# Tay trái và phải theo quán tính bước
+		var arm_l_y = torso_y + 7 + arm_l
+		var arm_r_y = torso_y + 7 + arm_r
+		for ay in range(arm_l_y, arm_l_y + 5):
+			for ax in range(13 - torso_w_mod, 16 - torso_w_mod):
+				img.set_pixel(ax, ay, pal_cloth)
+		for ay in range(arm_r_y, arm_r_y + 5):
+			for ax in range(32 + torso_w_mod, 35 + torso_w_mod):
+				img.set_pixel(ax, ay, pal_cloth)
 
-		# 8. Symmetrical Cyber-Commander Helm & Visor
+		# Đèn tín hiệu cổ tay / hoa tiêu lửa Pyro
+		if op_id == "pyro":
+			img.set_pixel(34 + torso_w_mod, arm_r_y + 4, Color(3.8, 2.5, 0.4))
+		else:
+			img.set_pixel(14 - torso_w_mod, arm_l_y + 4, pal_energy)
+			img.set_pixel(33 + torso_w_mod, arm_r_y + 4, pal_energy)
+
+		# 5. Mũ Chiến Binh & Kính Ngắm (Helm & Visor)
 		var helm_y = torso_y - 8
 		for hy in range(helm_y, helm_y + 8):
-			for hx in range(19, 30):
-				var dx = (hx - 24.0) / 5.0
-				var dy = (hy - (helm_y + 4)) / 4.0
+			for hx in range(19, 29):
+				var dx = (hx - 24.0) / 4.5
+				var dy = (hy - (helm_y + 4)) / 3.8
 				if dx * dx + dy * dy <= 1.0:
-					var h_col = Color(0.85, 0.9, 0.98, 1.0)
-					if dy > 0.4: h_col = Color(0.22, 0.28, 0.38, 1.0)
-					img.set_pixel(hx, hy, h_col)
+					img.set_pixel(hx, hy, pal_armor.lightened(0.18))
 
-		# Centered Tactical Antenna / Helmet Crest
-		for cy in range(helm_y - 3, helm_y + 1):
-			img.set_pixel(24, cy, Color(0.3, 2.5, 3.5, 1.0))
-
-		# Symmetrical Glowing Neon Visor (Centered at 24.0: 21 to 27)
-		for vx in range(21, 28):
-			img.set_pixel(vx, helm_y + 4, Color(0.3, 3.2, 4.2, 1.0))
-			img.set_pixel(vx, helm_y + 5, Color(0.15, 2.4, 3.2, 0.9))
-		img.set_pixel(24, helm_y + 4, Color(2.0, 4.0, 4.5, 1.0)) # Visor center reflection
+		# Kính ngắm neon (Visor)
+		match op_id:
+			"volt": # Mắt đơn Cyclops tròn rực sáng
+				img.set_pixel(24, helm_y + 4, Color(4.0, 4.0, 4.0))
+				img.set_pixel(23, helm_y + 4, pal_energy)
+				img.set_pixel(25, helm_y + 4, pal_energy)
+			"colossus": # Khe mắt chiến binh chữ T hẹp
+				for vx in range(21, 27):
+					img.set_pixel(vx, helm_y + 4, pal_energy)
+				img.set_pixel(24, helm_y + 5, pal_energy)
+			_: # Vex & Pyro: Kính ngắm chiến thuật ngang
+				for vx in range(21, 27):
+					img.set_pixel(vx, helm_y + 4, pal_energy)
+				img.set_pixel(24, helm_y + 4, Color.WHITE)
 
 		frames.append(ImageTexture.create_from_image(img))
 
 	return frames
+
+static func create_operative_avatar(op_id: String) -> ImageTexture:
+	var frames = create_operative_frames(op_id)
+	if not frames.is_empty():
+		return frames[0]
+	return create_pylon_texture()
 
 
 static func create_pylon_texture() -> ImageTexture:
@@ -486,6 +650,7 @@ static func create_gem_texture() -> ImageTexture:
 				facet_col = Color(0.06, 0.55, 0.22, 1.0)
 			if abs(x - 12) <= 1 and abs(y - 10) <= 2:
 				facet_col = Color(2.2, 3.6, 2.4, 1.0)
+			img.set_pixel(x, y, facet_col)
 
 	return ImageTexture.create_from_image(img)
 
@@ -693,6 +858,50 @@ static func create_boss_texture() -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
+static func create_dreadnought_texture() -> ImageTexture:
+	var w = 104
+	var h = 104
+	var img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	# 1. Massive Ground Shadow
+	for y in range(74, 98):
+		for x in range(16, 88):
+			var dx = (x - 52.0) / 34.0
+			var dy = (y - 86.0) / 10.5
+			if dx * dx + dy * dy <= 1.0:
+				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.65))
+
+	# 2. Titan Mech Hull Plating
+	for y in range(20, 82):
+		for x in range(20, 84):
+			var dx = (x - 52.0) / 28.0
+			var dy = (y - 52.0) / 27.0
+			var dist = dx * dx + dy * dy
+			if dist <= 1.0:
+				var col = Color(0.08, 0.12, 0.20, 1.0)
+				# Cyan Energy Circuit Traces
+				if (abs(x - 52) == 12 or abs(x - 52) == 20) and y >= 30 and y <= 70:
+					col = Color(0.2, 2.5, 3.8, 1.0)
+				elif y == 52 and abs(x - 52) <= 24:
+					col = Color(0.3, 2.8, 4.0, 1.0)
+				elif dist < 0.25:
+					col = Color(0.4, 3.5, 4.5, 1.0) # Central Reactor Core
+				img.set_pixel(x, y, col)
+
+	# 3. Twin Heavy Plasma Turrets
+	for y in range(10, 30):
+		for x in range(32, 38):
+			img.set_pixel(x, y, Color(0.18, 0.24, 0.35, 1.0))
+		for x in range(66, 72):
+			img.set_pixel(x, y, Color(0.18, 0.24, 0.35, 1.0))
+	img.set_pixel(35, 10, Color(0.3, 3.5, 4.5, 1.0))
+	img.set_pixel(69, 10, Color(0.3, 3.5, 4.5, 1.0))
+
+	return ImageTexture.create_from_image(img)
+
+
+
 static func create_mortar_canister_texture() -> ImageTexture:
 	var w = 16
 	var h = 16
@@ -738,8 +947,8 @@ static func _draw_line_on_image(img: Image, p1: Vector2, p2: Vector2, col: Color
 	var steps = max(int(dist * 2.0), 1)
 	for s in range(steps + 1):
 		var p = p1.lerp(p2, float(s) / float(steps))
-		for ty in range(-thickness / 2, (thickness + 1) / 2):
-			for tx in range(-thickness / 2, (thickness + 1) / 2):
+		for ty in range(-(thickness >> 1), (thickness + 1) >> 1):
+			for tx in range(-(thickness >> 1), (thickness + 1) >> 1):
 				var px = int(p.x) + tx
 				var py = int(p.y) + ty
 				if px >= 0 and px < img.get_width() and py >= 0 and py < img.get_height():
@@ -1823,7 +2032,7 @@ static func create_generator_texture() -> ImageTexture:
 		var min_x = int(32.0 - half_w)
 		var max_x = int(32.0 + half_w)
 		for x in range(min_x, max_x + 1):
-			var is_stripe = ((x + y) / 5) % 2 == 0
+			var is_stripe = (int(float(x + y) / 5.0)) % 2 == 0
 			var col = Color(1.5, 1.0, 0.15, 1.0) if is_stripe else Color(0.1, 0.11, 0.14, 1.0)
 			if x == min_x or y == 80:
 				col = col * 1.3
@@ -1831,7 +2040,6 @@ static func create_generator_texture() -> ImageTexture:
 
 	# 3. Main Reactor Column (y=32..80)
 	for y in range(32, 80):
-		var t = float(y - 32) / 48.0
 		var half_w = 14.0
 		var min_x = int(32.0 - half_w)
 		var max_x = int(32.0 + half_w)
@@ -1900,7 +2108,7 @@ static func create_hazard_barrier_texture() -> ImageTexture:
 	# Heavy Barricade Beam with Hazard Chevrons (y=10..24)
 	for y in range(10, 24):
 		for x in range(8, 48):
-			var stripe = ((x * 2 + y) / 6) % 2 == 0
+			var stripe = (int(float(x * 2 + y) / 6.0)) % 2 == 0
 			var col = Color(1.5, 1.0, 0.15, 1.0) if stripe else Color(0.12, 0.14, 0.18, 1.0)
 			if y == 10: col = col * 1.3
 			if y == 23: col = Color(0.05, 0.06, 0.08, 1.0)

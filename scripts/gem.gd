@@ -110,13 +110,18 @@ func _process(delta: float) -> void:
 		var dir = (target.global_position - global_position).normalized()
 		global_position += (dir * speed + swirl_offset) * delta
 
+		var tier = get_tier_info()
+		if particle_mgr and randf() < 0.22:
+			particle_mgr.spawn_sparks(global_position + Vector2(0, bob_offset), tier.color * 1.3, 1)
+
 		if global_position.distance_to(target.global_position) < 28.0:
 			if target.has_method("add_xp"):
 				target.add_xp(xp_value)
-			var tier = get_tier_info()
 			if sound_mgr:
 				if tier.sound_chest and sound_mgr.has_method("play_chest"):
 					sound_mgr.play_chest()
+				elif sound_mgr.has_method("enqueue_gem_pickup"):
+					sound_mgr.enqueue_gem_pickup(1)
 				elif sound_mgr.has_method("play_gem_pickup"):
 					sound_mgr.play_gem_pickup()
 			if particle_mgr:

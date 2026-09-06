@@ -1,6 +1,7 @@
 extends Node2D
 
 const SpriteFactory = preload("res://scripts/sprite_factory.gd")
+const SaveManagerClass = preload("res://scripts/save_manager.gd")
 
 @export var pickup_type: String = "nuke" # "nuke", "vacuum", "medkit", "overclock", "gold"
 
@@ -103,12 +104,14 @@ func _consume_pickup() -> void:
 				floating_txt_mgr.spawn_text(global_position, "⚡ QUÁ TẢI TỐC ĐỘ 200%!", Color(3.5, 3.0, 0.3, 1.0))
 
 		"gold":
+			var nanite_amount = randi_range(35, 75)
+			SaveManagerClass.add_nanites(nanite_amount)
 			if player_ref and player_ref.has_method("add_xp"):
-				player_ref.add_xp(300)
+				player_ref.add_xp(120)
 			if sound_mgr and sound_mgr.has_method("play_gem_pickup"):
 				sound_mgr.play_gem_pickup()
 			if floating_txt_mgr and floating_txt_mgr.has_method("spawn_text"):
-				floating_txt_mgr.spawn_text(global_position, "💰 +300 EXP THƯỞNG!", Color(3.5, 2.5, 0.4, 1.0))
+				floating_txt_mgr.spawn_text(global_position, "💎 +%d NANITES & EXP!" % nanite_amount, Color(3.5, 2.5, 0.4, 1.0))
 
 	if particle_mgr:
 		particle_mgr.spawn_sparks(global_position, Color(3.0, 3.0, 3.0, 1.0), 12)

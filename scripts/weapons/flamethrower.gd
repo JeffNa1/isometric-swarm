@@ -11,16 +11,20 @@ var tick_timer: float = 0.0
 var swarm_mgr: Node2D = null
 var sound_mgr: Node = null
 var particle_mgr: Node2D = null
+var player_ref: CharacterBody2D = null
 var current_aim_dir: Vector2 = Vector2.RIGHT
 
-# Dynamic flame puff data for rendering rolling turbulent fireballs (zero-allocation)
-const MAX_PUFFS: int = 120
+# Dynamic flame puff data
+const MAX_PUFFS: int = 140
 var puff_offset: PackedVector2Array = PackedVector2Array()
 var puff_dist_ratio: PackedFloat32Array = PackedFloat32Array()
 var puff_size: PackedFloat32Array = PackedFloat32Array()
 var puff_color: PackedColorArray = PackedColorArray()
 var puff_life: PackedFloat32Array = PackedFloat32Array()
 var puff_count: int = 0
+
+var is_evolved: bool = false
+var swirl_angle: float = 0.0
 
 @onready var flame_light: PointLight2D = $FlameLight
 
@@ -43,22 +47,43 @@ func _get_managers() -> void:
 		swarm_mgr = cur.get_node_or_null("SwarmManager")
 		sound_mgr = cur.get_node_or_null("SoundManager")
 		particle_mgr = cur.get_node_or_null("ParticleManager")
+		player_ref = cur.get_node_or_null("Entities/Player")
 
 func _process(delta: float) -> void:
-	if not swarm_mgr:
+	if not swarm_mgr or not player_ref:
 		_get_managers()
 
-	var parent_body = get_parent().get_parent()
-	if parent_body and "velocity" in parent_body and parent_body.velocity.length_squared() > 10.0:
-		current_aim_dir = parent_body.velocity.normalized()
+	# Smart Aiming: Find closest enemy in 360 degree vicinity
+	if not is_evolved and swarm_mgr and swarm_mgr.active_count > 0:
+		var origin = global_position
+		var nearby = swarm_mgr.spatial_grid.get_nearby(origin, flame_range * 1.4)
+		var closest_target: Vector2 = Vector2.ZERO
+		var min_dist_sq: float = (flame_range * 1.4) * (flame_range * 1.4)
+		for idx in nearby:
+			if idx < swarm_mgr.active_count:
+				var ep = swarm_mgr.positions[idx]
+				var d_sq = origin.distance_squared_to(ep)
+				if d_sq < min_dist_sq:
+					min_dist_sq = d_sq
+					closest_target = ep
 
-	# Flickering dynamic flame light
+		if closest_target != Vector2.ZERO:
+			var desired_dir = (closest_target - origin).normalized()
+			current_aim_dir = current_aim_dir.slerp(desired_dir, 14.0 * delta)
+		else:
+			# Fallback to velocity
+			if player_ref and player_ref.velocity.length_squared() > 10.0:
+				current_aim_dir = current_aim_dir.slerp(player_ref.velocity.normalized(), 8.0 * delta)
+	elif is_evolved:
+		swirl_angle += delta * 6.0
+
+	# Flickering flame light
 	if flame_light:
-		var light_pos = Vector2(0, -12) + current_aim_dir * (flame_range * 0.42)
+		var light_pos = Vector2(0, -12) + (current_aim_dir * (flame_range * 0.42) if not is_evolved else Vector2.ZERO)
 		flame_light.position = light_pos
-		flame_light.energy = randf_range(0.9, 1.45)
+		flame_light.energy = randf_range(1.0, 1.6)
 
-	# Update existing puffs with swap-and-pop O(1)
+	# Update existing puffs O(1)
 	var i = 0
 	while i < puff_count:
 		puff_life[i] -= delta * 3.5
@@ -74,8 +99,11 @@ func _process(delta: float) -> void:
 		else:
 			i += 1
 
+	var cd_mult = player_ref.cooldown_reduction if (player_ref and "cooldown_reduction" in player_ref) else 0.0
+	var actual_interval = max(0.03, tick_interval * (1.0 - cd_mult))
+
 	tick_timer += delta
-	if tick_timer >= tick_interval:
+	if tick_timer >= actual_interval:
 		tick_timer = 0.0
 		_burn_and_emit_stream()
 
@@ -85,51 +113,62 @@ func _burn_and_emit_stream() -> void:
 	if not swarm_mgr or swarm_mgr.active_count == 0:
 		return
 
-	# Emit new rolling fireball puffs along cone
 	var half_angle_rad = deg_to_rad(flame_angle * 0.5)
 	var dir_angle = current_aim_dir.angle()
 
-	for p in range(5):
+	var num_puffs = 10 if is_evolved else 5
+	for p in range(num_puffs):
 		if puff_count >= MAX_PUFFS:
 			break
 		var idx = puff_count
 		var dist_r = randf_range(0.15, 1.0)
 		puff_dist_ratio[idx] = dist_r
-		var spread_angle = dir_angle + randf_range(-half_angle_rad, half_angle_rad) * dist_r
-		var dist = flame_range * dist_r
 
-		# 2:1 isometric compression
+		var spread_angle = 0.0
+		if is_evolved:
+			spread_angle = randf() * TAU
+		else:
+			spread_angle = dir_angle + randf_range(-half_angle_rad, half_angle_rad) * dist_r
+
+		var dist = flame_range * dist_r
 		var stream_vec = Vector2(cos(spread_angle) * dist, sin(spread_angle) * dist * 0.75)
 		puff_offset[idx] = Vector2(0, -14) + stream_vec
-		puff_size[idx] = lerp(8.0, 32.0, dist_r) * randf_range(0.85, 1.15)
+		puff_size[idx] = lerp(8.0, 34.0, dist_r) * randf_range(0.85, 1.15)
 		puff_life[idx] = randf_range(0.8, 1.0)
 
-		# Color temperature curve: White-Yellow core -> Orange flame -> Dark smoke
 		if dist_r < 0.35:
-			puff_color[idx] = Color(3.5, 2.5, 0.8, 0.85) # Incandescent White-Gold
+			puff_color[idx] = Color(3.5, 2.5, 0.8, 0.85)
 		elif dist_r < 0.7:
-			puff_color[idx] = Color(2.8, 1.1, 0.1, 0.75) # Fiery Orange
+			puff_color[idx] = Color(2.8, 1.1, 0.1, 0.75)
 		else:
-			puff_color[idx] = Color(1.4, 0.25, 0.05, 0.5) # Outer Crimson Embers
+			puff_color[idx] = Color(1.4, 0.25, 0.05, 0.5)
 
 		puff_count += 1
 
-	# Execute cone damage
-	var hits = swarm_mgr.damage_in_cone(global_position, current_aim_dir, flame_range, flame_angle, damage_per_tick)
+	var dmg_mult = player_ref.damage_multiplier if (player_ref and "damage_multiplier" in player_ref) else 1.0
+	var final_dmg = damage_per_tick * dmg_mult
+
+	var hits = 0
+	if is_evolved:
+		hits = swarm_mgr.damage_in_radius(global_position, flame_range, final_dmg, 45.0)
+	else:
+		hits = swarm_mgr.damage_in_cone(global_position, current_aim_dir, flame_range, flame_angle, final_dmg)
+
+	if hits > 0 and player_ref and player_ref.has_method("record_weapon_damage"):
+		player_ref.record_weapon_damage("flame", final_dmg * hits)
 
 	if sound_mgr and randf() < 0.38:
 		sound_mgr.play_flame()
 
-	# Spawn scorch marks and sparks on ground
 	if particle_mgr and hits > 0:
 		for s in range(2):
-			var dist = randf_range(50.0, flame_range * 0.9)
-			var spread = randf_range(-half_angle_rad, half_angle_rad) * (dist / flame_range)
-			var ground_p = global_position + Vector2(cos(dir_angle + spread) * dist, sin(dir_angle + spread) * dist * 0.5)
+			var dist = randf_range(40.0, flame_range * 0.9)
+			var a = (randf() * TAU) if is_evolved else (dir_angle + randf_range(-half_angle_rad, half_angle_rad))
+			var ground_p = global_position + Vector2(cos(a) * dist, sin(a) * dist * 0.5)
 			particle_mgr.spawn_scorch_mark(ground_p, Color(2.2, 0.8, 0.1, 0.85))
 			particle_mgr.spawn_sparks(ground_p, Color(2.5, 1.2, 0.2, 1.0), 3)
-
-var is_evolved: bool = false
+			if particle_mgr.has_method("spawn_plasma_ember") and randf() < 0.7:
+				particle_mgr.spawn_plasma_ember(ground_p, Color(3.5, 1.8, 0.3, 1.0), 2)
 
 func evolve_sunstorm() -> void:
 	is_evolved = true
@@ -144,17 +183,13 @@ func upgrade_flame() -> void:
 	damage_per_tick += 3.0
 
 func _draw() -> void:
-	# Draw turbulent rolling fireball puffs
 	for i in range(puff_count):
 		var alpha = clamp(puff_life[i], 0.0, 1.0)
 		var c = puff_color[i]
 		c.a *= alpha
 		var off = puff_offset[i]
 		var sz = puff_size[i]
-		# Outer soft flame halo
 		draw_circle(off, sz, Color(c.r * 0.6, c.g * 0.4, c.b * 0.4, c.a * 0.4))
-		# Hot flame core
 		draw_circle(off, sz * 0.65, c)
-		# Ultra-hot center if near base
 		if puff_dist_ratio[i] < 0.35:
 			draw_circle(off, sz * 0.35, Color(3.5, 3.5, 2.0, c.a))

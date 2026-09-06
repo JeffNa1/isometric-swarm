@@ -23,8 +23,9 @@ func _puff_steam() -> void:
 	var cur = get_tree().current_scene
 	if cur:
 		var pm = cur.get_node_or_null("ParticleManager")
-		if pm and pm.has_method("spawn_sparks"):
-			# Plume of high-pressure cooling steam
+		if pm and pm.has_method("spawn_steam_plume"):
+			pm.spawn_steam_plume(global_position + Vector2(0, -6), Vector2(0, -1), 8)
+		elif pm and pm.has_method("spawn_sparks"):
 			pm.spawn_sparks(global_position, Color(1.8, 2.2, 2.8, 0.7), 6)
 
 func _draw() -> void:

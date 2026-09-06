@@ -14,6 +14,7 @@ var swarm_mgr: Node2D = null
 var sound_mgr: Node = null
 var particle_mgr: Node2D = null
 var camera_node: Camera2D = null
+var player_ref: CharacterBody2D = null
 
 var corkscrew_phase: float = 0.0
 var corkscrew_freq: float = 16.0
@@ -30,6 +31,7 @@ func _get_managers() -> void:
 		sound_mgr = cur.get_node_or_null("SoundManager")
 		particle_mgr = cur.get_node_or_null("ParticleManager")
 		camera_node = cur.get_node_or_null("Camera2D")
+		player_ref = cur.get_node_or_null("Entities/Player")
 
 func setup(dir: Vector2, target: Vector2, dmg: float) -> void:
 	direction = dir.normalized()
@@ -57,73 +59,65 @@ func _process(delta: float) -> void:
 	global_position += (direction * speed * delta) + corkscrew_offset
 
 	# Rocket exhaust & smoke trail
-	if particle_mgr and randf() < 0.7:
+	if particle_mgr:
 		var exhaust_p = global_position - direction * 12.0
-		particle_mgr.spawn_smoke_trail(exhaust_p, -direction * 40.0, Color(0.7, 0.7, 0.8, 0.45))
-		particle_mgr.spawn_sparks(exhaust_p, Color(3.5, 1.8, 0.3, 1.0), 1)
+		if randf() < 0.65:
+			particle_mgr.spawn_smoke_trail(exhaust_p, -direction * 40.0, Color(0.7, 0.7, 0.8, 0.45))
+			particle_mgr.spawn_sparks(exhaust_p, Color(3.5, 1.8, 0.3, 1.0), 1)
+		if randf() < 0.35 and particle_mgr.has_method("spawn_plasma_ember"):
+			particle_mgr.spawn_plasma_ember(exhaust_p, Color(3.5, 1.8, 0.3, 1.0), 1)
 
-	# Check proximity to target or collision with swarm
+	# Check proximity to target
 	if target_pos != Vector2.ZERO and global_position.distance_to(target_pos) < 28.0:
 		_detonate()
 		return
 
-	# Fast check against swarm
+	# Fast O(1) collision check against any nearby swarm enemy
 	if swarm_mgr and swarm_mgr.active_count > 0:
-		var nearest_sq = 999999.0
-		var sample_cnt = min(swarm_mgr.active_count, 40)
-		for i in range(sample_cnt):
-			var d_sq = global_position.distance_squared_to(swarm_mgr.positions[i])
-			if d_sq < nearest_sq:
-				nearest_sq = d_sq
-		if nearest_sq < (22.0 * 22.0):
-			_detonate()
-			return
+		var nearby = swarm_mgr.spatial_grid.get_nearby(global_position, 28.0)
+		for idx in nearby:
+			if idx < swarm_mgr.active_count:
+				if global_position.distance_squared_to(swarm_mgr.positions[idx]) <= (24.0 * 24.0):
+					_detonate()
+					return
 
 	queue_redraw()
 
 func _detonate() -> void:
 	if swarm_mgr:
-		swarm_mgr.damage_in_radius(global_position, blast_radius, damage, knockback_force)
+		var hits = swarm_mgr.damage_in_radius(global_position, blast_radius, damage, knockback_force)
+		if hits > 0 and player_ref and player_ref.has_method("record_weapon_damage"):
+			player_ref.record_weapon_damage("missile", damage * hits)
 
 	if sound_mgr and sound_mgr.has_method("play_missile_explode"):
 		sound_mgr.play_missile_explode()
 
 	if camera_node and camera_node.has_method("add_trauma"):
-		camera_node.add_trauma(0.18)
+		camera_node.add_trauma(0.24)
 
-	# Shrapnel and cluster burst
 	if particle_mgr:
 		particle_mgr.spawn_sparks(global_position, Color(3.5, 2.0, 0.4, 1.0), 14)
 		particle_mgr.spawn_blood_burst(global_position, Color(2.5, 1.0, 0.1, 1.0), 8)
+		if particle_mgr.has_method("spawn_shockwave_debris"):
+			particle_mgr.spawn_shockwave_debris(global_position, 35.0, 6)
+		if particle_mgr.has_method("spawn_scorch_mark"):
+			particle_mgr.spawn_scorch_mark(global_position, Color(1.8, 0.9, 0.2, 0.8))
 
 	queue_free()
 
 func _draw() -> void:
+	# Rocket body: slender supersonic missile
 	var rot = direction.angle()
 	draw_set_transform(Vector2.ZERO, rot, Vector2.ONE)
 
-	# Missile Aerodynamic Chassis
-	var body_poly = PackedVector2Array([
-		Vector2(12, 0),
-		Vector2(4, -3),
-		Vector2(-10, -3),
-		Vector2(-12, -6),
-		Vector2(-12, 6),
-		Vector2(-10, 3),
-		Vector2(4, 3)
-	])
-	draw_colored_polygon(body_poly, Color(0.2, 0.25, 0.32, 1.0))
-
-	# Glowing missile nose cone
-	draw_circle(Vector2(10, 0), 3.0, Color(3.5, 1.5, 0.2, 1.0))
-
-	# Rocket exhaust flare
-	var thrust_len = randf_range(8.0, 15.0)
-	var exhaust_poly = PackedVector2Array([
-		Vector2(-10, -2.5),
-		Vector2(-10 - thrust_len, 0),
-		Vector2(-10, 2.5)
-	])
-	draw_colored_polygon(exhaust_poly, Color(3.5, 2.5, 0.5, 1.0))
+	# Main fuselage
+	draw_line(Vector2(-10, 0), Vector2(10, 0), Color(0.85, 0.9, 0.95, 1.0), 4.0)
+	# Warhead
+	draw_circle(Vector2(10, 0), 2.5, Color(3.5, 1.2, 0.2, 1.0))
+	# Stabilizer fins
+	draw_line(Vector2(-8, -5), Vector2(-4, 0), Color(0.3, 0.4, 0.6, 1.0), 2.0)
+	draw_line(Vector2(-8, 5), Vector2(-4, 0), Color(0.3, 0.4, 0.6, 1.0), 2.0)
+	# Glowing rocket engine nozzle
+	draw_circle(Vector2(-10, 0), 3.0, Color(3.5, 2.5, 0.5, 1.0))
 
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

@@ -22,6 +22,7 @@ var swarm_mgr: Node2D = null
 var sound_mgr: Node = null
 var particle_mgr: Node2D = null
 var camera_node: Camera2D = null
+var player_ref: CharacterBody2D = null
 
 static var canister_tex: ImageTexture = null
 
@@ -38,6 +39,7 @@ func _get_managers() -> void:
 		sound_mgr = cur.get_node_or_null("SoundManager")
 		particle_mgr = cur.get_node_or_null("ParticleManager")
 		camera_node = cur.get_node_or_null("Camera2D")
+		player_ref = cur.get_node_or_null("Entities/Player")
 
 func setup(p_start: Vector2, p_target: Vector2, p_dmg: float, p_pool_dmg: float, p_radius: float, p_evolved: bool = false) -> void:
 	start_pos = p_start
@@ -49,7 +51,7 @@ func setup(p_start: Vector2, p_target: Vector2, p_dmg: float, p_pool_dmg: float,
 	if is_evolved:
 		arc_height = 180.0
 		flight_duration = 0.75
-		pool_duration = 8.0
+		pool_duration = 5.0
 	global_position = start_pos
 
 func _process(delta: float) -> void:
@@ -79,7 +81,9 @@ func _on_impact() -> void:
 
 	# Impact damage
 	if swarm_mgr and swarm_mgr.active_count > 0:
-		swarm_mgr.damage_in_radius(target_pos, 70.0, impact_damage, 220.0)
+		var hits = swarm_mgr.damage_in_radius(target_pos, 70.0, impact_damage, 220.0)
+		if hits > 0 and player_ref and player_ref.has_method("record_weapon_damage"):
+			player_ref.record_weapon_damage("mortar", impact_damage * hits)
 
 	# Sound & Screen Shake
 	if sound_mgr and sound_mgr.has_method("play_mortar"):

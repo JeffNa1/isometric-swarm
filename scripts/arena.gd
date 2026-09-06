@@ -5,9 +5,28 @@ const ARENA_SIZE: float = 10000.0
 const PowerGeneratorScript = preload("res://scripts/power_generator.gd")
 const SteamVentScript = preload("res://scripts/steam_vent.gd")
 
+@onready var ground_rect: ColorRect = $GroundRect
+var player_ref: CharacterBody2D = null
+var ground_mat: ShaderMaterial = null
+
 func _ready() -> void:
+	if ground_rect and ground_rect.material is ShaderMaterial:
+		ground_mat = ground_rect.material as ShaderMaterial
 	_create_boundaries()
 	_spawn_environmental_props()
+
+func _process(_delta: float) -> void:
+	if not is_instance_valid(player_ref):
+		var cur = get_tree().current_scene
+		if cur:
+			player_ref = cur.get_node_or_null("Entities/Player")
+	
+	if is_instance_valid(player_ref) and ground_mat:
+		ground_mat.set_shader_parameter("player_pos", player_ref.global_position)
+		var intensity = 1.0
+		if "overclock_timer" in player_ref and player_ref.overclock_timer > 0.0:
+			intensity = 1.45
+		ground_mat.set_shader_parameter("player_light_intensity", intensity)
 
 func _create_boundaries() -> void:
 	var half_size = ARENA_SIZE * 0.5

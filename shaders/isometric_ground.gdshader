@@ -13,6 +13,12 @@ uniform vec4 void_nebula_color : source_color = vec4(0.04, 0.015, 0.09, 1.0); //
 uniform float grid_scale : hint_range(16.0, 256.0) = 64.0;
 uniform vec2 arena_size = vec2(10000.0, 10000.0);
 
+// Dynamic Player Contact Light
+uniform vec2 player_pos = vec2(0.0, 0.0);
+uniform float player_light_intensity = 1.0;
+uniform vec4 player_light_color : source_color = vec4(0.25, 0.70, 1.20, 1.0);
+uniform float player_light_radius = 480.0;
+
 varying vec2 world_pos;
 
 // --- FAST PROCEDURAL HASH & NOISE FUNCTIONS ---
@@ -72,26 +78,31 @@ void fragment() {
 	float t_rand2 = hash2(tile_id);
 
 	// -------------------------------------------------------------
-	// 2. 3D BEVEL LIGHTING & AMBIENT OCCLUSION (Tactile Depth)
+	// 2. PROCEDURAL HEIGHT MAP & NORMAL RECONSTRUCTION
 	// -------------------------------------------------------------
-	// Isometric light direction (Top-Left key light):
-	// High bevel highlight on top edges (small u, small v)
-	// Ambient shadow on bottom edges (large u, large v)
-	float bevel_highlight = smoothstep(0.08, 0.01, cell_uv.x) * 0.07 + smoothstep(0.08, 0.01, cell_uv.y) * 0.07;
-	float bevel_shadow = smoothstep(0.92, 0.99, cell_uv.x) * 0.12 + smoothstep(0.92, 0.99, cell_uv.y) * 0.12;
+	// Height map: seams are 0.0, plate surface is 0.85, bevel edges interpolate
+	float edge_t = smoothstep(0.0, 0.08, min_dist_seam);
+	float tile_height = edge_t * 0.85;
 
 	// Mechanical Corner Rivets/Bolts
 	vec2 rivet_uv = abs(cell_uv - 0.5);
 	float dist_to_bolt = length(rivet_uv - vec2(0.40, 0.40));
 	float bolt_head = smoothstep(0.045, 0.02, dist_to_bolt);
 	float bolt_specular = smoothstep(0.025, 0.01, length(rivet_uv - vec2(0.39, 0.39)));
+	tile_height = mix(tile_height, 1.0, bolt_head * 0.6);
+
+	// Procedural normal reconstruction via screen space derivatives
+	vec2 dH = vec2(dFdx(tile_height), dFdy(tile_height));
+	vec3 surface_normal = normalize(vec3(-dH * 4.0, 1.0));
 
 	// Base plate color with subtle metallic grain
 	vec4 tile_base_col = bg_color;
 	float grain = (hash(floor(world_pos * 0.2)) - 0.5) * 0.035;
 	tile_base_col += vec4(grain, grain, grain * 1.4, 0.0);
 
-	// Apply 3D Bevel shading
+	// 3D Bevel shading
+	float bevel_highlight = smoothstep(0.08, 0.01, cell_uv.x) * 0.07 + smoothstep(0.08, 0.01, cell_uv.y) * 0.07;
+	float bevel_shadow = smoothstep(0.92, 0.99, cell_uv.x) * 0.12 + smoothstep(0.92, 0.99, cell_uv.y) * 0.12;
 	tile_base_col.rgb += vec3(bevel_highlight) * 0.7;
 	tile_base_col.rgb -= vec3(bevel_shadow) * 0.5;
 
@@ -102,51 +113,52 @@ void fragment() {
 	}
 
 	// -------------------------------------------------------------
-	// 3. PROCEDURAL TILE VARIATIONS
+	// 3. PROCEDURAL TILE PATTERNS & DETAILS
 	// -------------------------------------------------------------
-	if (t_rand < 0.62) {
+	if (t_rand < 0.60) {
 		// Type A: Standard Reinforced Armor Deck with Inner Recessed Border
 		vec2 inner_seam = abs(cell_uv - 0.5);
 		float inner_groove = smoothstep(0.015, 0.0, abs(max(inner_seam.x, inner_seam.y) - 0.32));
 		tile_base_col.rgb -= vec3(0.04, 0.05, 0.07) * inner_groove;
 
 		// Tread lines
-		if (t_rand > 0.42) {
+		if (t_rand > 0.40) {
 			float tread = smoothstep(0.1, 0.0, abs(fract((cell_uv.x - cell_uv.y) * 4.0) - 0.5) - 0.35);
 			tile_base_col.rgb += vec3(0.02, 0.025, 0.035) * tread;
 		}
-	} else if (t_rand < 0.78) {
+	} else if (t_rand < 0.76) {
 		// Type B: Heavy Ventilation Grate with Thermal Sub-Floor Glow
 		float grate_slats = smoothstep(0.12, 0.0, abs(fract(cell_uv.x * 7.0) - 0.5) - 0.28);
-		// Thermal glow pulsing under the slats
 		float vent_pulse = 0.7 + 0.3 * sin(TIME * 3.5 + t_rand * 6.28);
 		vec3 heat_core = vent_glow_color.rgb * vent_pulse;
 
-		// Mask grate within inner panel
 		float inner_mask = step(cell_uv.x, 0.88) * step(0.12, cell_uv.x) * step(cell_uv.y, 0.88) * step(0.12, cell_uv.y);
 		vec3 grate_col = mix(heat_core, vec3(0.02, 0.03, 0.04), grate_slats);
 		tile_base_col.rgb = mix(tile_base_col.rgb, grate_col, inner_mask * 0.9);
-	} else if (t_rand < 0.90) {
-		// Type C: Cybernetic Circuit Motherboard
+	} else if (t_rand < 0.89) {
+		// Type C: Cybernetic Circuit Motherboard with Under-Glass High-Speed Data Pulses
 		float trace_x = smoothstep(0.035, 0.0, abs(cell_uv.x - 0.5));
 		float trace_y = smoothstep(0.035, 0.0, abs(cell_uv.y - 0.5));
 		float trace_diag = smoothstep(0.035, 0.0, abs(cell_uv.x + cell_uv.y - 1.0));
 		float traces = max(max(trace_x, trace_y), trace_diag * step(0.2, t_rand2));
 
+		// Flowing data packets running along subterranean traces
+		float data_packet = pow(max(0.0, sin(TIME * 7.0 - (cell_uv.x + cell_uv.y) * 18.0 + t_rand * 10.0)), 24.0) * 2.2;
 		float circuit_pulse = 0.8 + 0.4 * sin(TIME * 4.0 + (tile_id.x + tile_id.y) * 1.3);
-		vec3 circuit_glow = accent_neon_color.rgb * circuit_pulse;
+		vec3 circuit_glow = accent_neon_color.rgb * (circuit_pulse + data_packet);
 
-		// Chip core at center
 		float chip = step(length(cell_uv - 0.5), 0.12);
 		tile_base_col.rgb = mix(tile_base_col.rgb, vec3(0.03, 0.04, 0.06), chip);
 		tile_base_col.rgb = mix(tile_base_col.rgb, circuit_glow, traces * 0.85);
 		tile_base_col.rgb += circuit_glow * chip * (0.5 + 0.5 * sin(TIME * 6.0));
-	} else if (t_rand < 0.97) {
-		// Type D: Hazard Caution Striping (Industrial Safety Chevron)
+	} else if (t_rand < 0.96) {
+		// Type D: Hazard Caution Striping (Industrial Safety Chevron with Chasing Warning Lights)
 		float stripe = step(0.5, fract((cell_uv.x + cell_uv.y) * 4.0));
-		vec3 hazard_band = mix(vec3(0.04, 0.04, 0.05), hazard_color.rgb, stripe);
+		float chase = sin(TIME * 6.0 + (cell_uv.x + cell_uv.y) * 12.0);
+		float hazard_blink = step(0.0, chase);
+		vec3 animated_hazard = mix(vec3(0.08, 0.05, 0.01), hazard_color.rgb * (1.1 + 0.3 * hazard_blink), stripe);
 		float hazard_mask = step(cell_uv.x, 0.86) * step(0.14, cell_uv.x) * step(cell_uv.y, 0.86) * step(0.14, cell_uv.y);
-		tile_base_col.rgb = mix(tile_base_col.rgb, hazard_band, hazard_mask * 0.85);
+		tile_base_col.rgb = mix(tile_base_col.rgb, animated_hazard, hazard_mask * 0.9);
 	} else {
 		// Type E: Overheated Reactor Crust (Glowing Energy Fractures)
 		float fracture = smoothstep(0.04, 0.0, abs(noise(cell_uv * 8.0 + tile_id) - 0.5));
@@ -172,11 +184,17 @@ void fragment() {
 	vec2 major_aa = major_dist / (fw / 8.0);
 	float major_line = 1.0 - clamp(min(major_aa.x, major_aa.y), 0.0, 1.0);
 
-	// Traveling Plasma Pulse along major lines (toned down to comfortable glow)
+	// Traveling Plasma Pulse along major lines + High-Speed Data Stream Spikes
+	float pulse_speed = TIME * 3.5;
+	float data_impulse = pow(max(0.0, sin(pulse_speed + (u + v) * 0.4)), 32.0) * 1.8;
+	float data_counter = pow(max(0.0, sin(-pulse_speed * 1.2 + (u - v) * 0.4)), 32.0) * 1.2;
+	vec3 data_stream_col = vec3(0.3, 1.4, 2.5) * (data_impulse + data_counter);
+
 	float plasma_wave = pow(max(0.0, sin(TIME * 1.8 + (u + v) * 0.3)), 12.0) * 0.65;
 	float plasma_ambient = 0.55 + 0.15 * sin(TIME * 1.5 + (u - v) * 0.15);
 	vec4 active_major_col = major_line_color * (plasma_ambient + plasma_wave);
 	tile_base_col = mix(tile_base_col, active_major_col, major_line * 0.65);
+	tile_base_col.rgb += data_stream_col * major_line * 0.75;
 
 	// Junction Power Nodes at Vertices (where 4 tiles meet)
 	float vertex_dist = length(dist_to_seam);
@@ -188,73 +206,91 @@ void fragment() {
 	}
 
 	// -------------------------------------------------------------
-	// 5. CENTRAL CITADEL REACTOR DECALS (Around Origin)
+	// 5. PBR PSEUDO-SPECULAR & AMBIENT KEY LIGHT REFLECTION
 	// -------------------------------------------------------------
-	// Isometric circular reactor rings:
-	// In isometric projection, world circles map to ellipse (x * 0.5, y)
+	// Isometric view vector (looking down from 30-degree isometric angle)
+	vec3 view_dir = normalize(vec3(0.0, 0.7071, 0.7071));
+	// Top-left key light
+	vec3 key_light_dir = normalize(vec3(-0.5, -0.6, 0.65));
+	vec3 key_half = normalize(key_light_dir + view_dir);
+	float key_spec = pow(max(0.0, dot(surface_normal, key_half)), 28.0) * 0.28;
+	tile_base_col.rgb += vec3(0.15, 0.25, 0.40) * key_spec;
+
+	// -------------------------------------------------------------
+	// 6. DYNAMIC POINT LIGHT BOUNCE & PLAYER INTERACTION
+	// -------------------------------------------------------------
+	vec2 to_player = player_pos - world_pos;
+	float player_dist = length(to_player);
+	if (player_dist < player_light_radius) {
+		float atten = 1.0 - (player_dist / player_light_radius);
+		atten = atten * atten; // Quadratic falloff
+
+		vec3 p_light_dir = normalize(vec3(to_player.x, to_player.y, 48.0));
+		float p_NdotL = max(0.0, dot(surface_normal, p_light_dir));
+		vec3 p_half = normalize(p_light_dir + view_dir);
+		float p_spec = pow(max(0.0, dot(surface_normal, p_half)), 24.0) * 0.65;
+
+		vec3 bounce = player_light_color.rgb * (p_NdotL * 0.28 + p_spec) * atten * player_light_intensity;
+		tile_base_col.rgb += bounce;
+	}
+
+	// -------------------------------------------------------------
+	// 7. CENTRAL CITADEL REACTOR DECALS (Around Origin)
+	// -------------------------------------------------------------
 	vec2 iso_radial_vec = vec2(world_pos.x * 0.5, world_pos.y);
 	float r_iso = length(iso_radial_vec);
 
-	// Concentric Reactor Rings at radius 160, 320, 520, 780
 	float ring1 = smoothstep(7.0, 0.0, abs(r_iso - 160.0));
 	float ring2 = smoothstep(8.0, 0.0, abs(r_iso - 320.0));
 	float ring3 = smoothstep(10.0, 0.0, abs(r_iso - 520.0));
 	float ring4 = smoothstep(12.0, 0.0, abs(r_iso - 780.0));
 	float all_rings = max(max(ring1, ring2), max(ring3, ring4));
 
-	// Rotating subtle radar beam in central core (dimmed & smoothed)
 	float angle_iso = atan(iso_radial_vec.y, iso_radial_vec.x);
 	float radar_sweep = pow(max(0.0, cos(angle_iso - TIME * 0.7)), 32.0) * step(r_iso, 520.0);
+	float core_breathe = 0.8 + 0.35 * sin(TIME * 2.0);
 
 	if (all_rings > 0.0 || radar_sweep > 0.0) {
-		vec3 reactor_glow = accent_neon_color.rgb * (all_rings * 0.25 + radar_sweep * 0.08);
-		tile_base_col.rgb += reactor_glow * 0.35;
+		vec3 reactor_glow = accent_neon_color.rgb * (all_rings * 0.35 * core_breathe + radar_sweep * 0.12);
+		tile_base_col.rgb += reactor_glow * 0.5;
 	}
 
 	// -------------------------------------------------------------
-	// 6. ATMOSPHERIC ISOMETRIC FOG / STEAM
+	// 8. MULTI-LAYER VOLUMETRIC ATMOSPHERIC LOW FOG
 	// -------------------------------------------------------------
-	vec2 fog_coords1 = vec2(u * 0.04 + TIME * 0.012, v * 0.04 + TIME * 0.008);
-	vec2 fog_coords2 = vec2(u * 0.08 - TIME * 0.016, v * 0.08 + TIME * 0.014);
-	float fog = fbm(fog_coords1) * 0.65 + fbm(fog_coords2) * 0.35;
-	tile_base_col.rgb += vec3(0.04, 0.09, 0.18) * (fog * 0.35);
+	vec2 fog_coords1 = vec2(u * 0.035 + TIME * 0.012, v * 0.035 + TIME * 0.007);
+	vec2 fog_coords2 = vec2(u * 0.070 - TIME * 0.018, v * 0.070 + TIME * 0.012);
+	float fog1 = fbm(fog_coords1);
+	float fog2 = fbm(fog_coords2);
+	float combined_fog = fog1 * 0.65 + fog2 * 0.35;
+	tile_base_col.rgb += vec3(0.03, 0.08, 0.16) * (combined_fog * 0.32);
 
 	// -------------------------------------------------------------
-	// 7. OUTER VOID CHASM & HOLOGRAPHIC CONTAINMENT BARRIER
+	// 9. OUTER VOID CHASM & HOLOGRAPHIC CONTAINMENT BARRIER
 	// -------------------------------------------------------------
 	vec2 half_arena = arena_size * 0.5;
 	vec2 dist_border = half_arena - abs(world_pos);
 	float min_dist_border = min(dist_border.x, dist_border.y);
 
-	// Beyond 4650px: The platform breaks into fractured floating fragments
 	if (min_dist_border < 350.0) {
 		float border_t = 1.0 - clamp(min_dist_border / 350.0, 0.0, 1.0);
-		// Fractured platform edge noise
 		float crack_noise = fbm(world_pos * 0.006 + vec2(42.0));
 		float void_threshold = mix(0.15, 0.85, pow(border_t, 1.6));
 
 		if (crack_noise < void_threshold) {
-			// DEEP SPACE ABYSS VOID
 			vec2 star_uv = world_pos * 0.002;
 			float star = step(0.985, hash(floor(star_uv * 120.0)));
 			float twinkle = 0.5 + 0.5 * sin(TIME * 6.0 + hash2(floor(star_uv * 120.0)) * 6.28);
-
-			// Space Nebula cloud
 			vec3 nebula = void_nebula_color.rgb * (0.8 + 0.4 * fbm(star_uv * 2.0));
 			vec3 space_col = nebula + vec3(1.2, 1.3, 1.5) * (star * twinkle * 1.5);
-
-			// Floating platform edge rim lighting
 			tile_base_col.rgb = space_col;
 		} else {
-			// Edge hazard glow
 			tile_base_col.rgb = mix(tile_base_col.rgb, border_color.rgb * 0.6, border_t * 0.45);
 		}
 	}
 
-	// Holographic Forcefield Laser Barrier right near physical collision border
 	if (min_dist_border < 140.0) {
 		float barrier_norm = 1.0 - clamp(min_dist_border / 140.0, 0.0, 1.0);
-		// Hexagonal / grid scanline pattern
 		float scanline = 0.75 + 0.25 * sin(world_pos.x * 0.2 + world_pos.y * 0.2 + TIME * 8.0);
 		float electric_spark = pow(max(0.0, sin(TIME * 16.0 + world_pos.x * 0.05)), 16.0) * 1.8;
 		vec4 barrier_pulse = border_color * (barrier_norm * scanline + electric_spark);

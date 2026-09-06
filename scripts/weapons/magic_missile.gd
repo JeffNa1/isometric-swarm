@@ -10,6 +10,7 @@ const MISSILE_SCENE = preload("res://scenes/weapons/missile_projectile.tscn")
 var fire_timer: float = 0.0
 var swarm_mgr: Node2D = null
 var sound_mgr: Node = null
+var player_ref: CharacterBody2D = null
 
 func _ready() -> void:
 	_get_managers()
@@ -19,13 +20,17 @@ func _get_managers() -> void:
 	if cur:
 		swarm_mgr = cur.get_node_or_null("SwarmManager")
 		sound_mgr = cur.get_node_or_null("SoundManager")
+		player_ref = cur.get_node_or_null("Entities/Player")
 
 func _process(delta: float) -> void:
-	if not swarm_mgr:
+	if not swarm_mgr or not player_ref:
 		_get_managers()
 
+	var cd_mult = player_ref.cooldown_reduction if (player_ref and "cooldown_reduction" in player_ref) else 0.0
+	var actual_rate = max(0.2, fire_rate * (1.0 - cd_mult))
+
 	fire_timer += delta
-	if fire_timer >= fire_rate:
+	if fire_timer >= actual_rate:
 		fire_timer = 0.0
 		_attempt_fire()
 
@@ -75,15 +80,16 @@ func _spawn_missile(target_pos: Vector2, volley_idx: int) -> void:
 	var spread_angle = base_dir.angle() + randf_range(-0.35, 0.35)
 	var fire_dir = Vector2.from_angle(spread_angle)
 
-	projectile.setup(fire_dir, target_pos, damage)
+	var crit_info = player_ref.roll_crit(damage) if (player_ref and player_ref.has_method("roll_crit")) else {"damage": damage, "is_crit": false}
+	projectile.setup(fire_dir, target_pos, float(crit_info["damage"]))
 
 var is_evolved: bool = false
 
 func evolve_barrage() -> void:
 	is_evolved = true
 	missiles_per_volley = 6
-	damage = 85.0
-	fire_rate = 0.55
+	damage = 110.0
+	fire_rate = 0.45
 
 func upgrade_missile() -> void:
 	missiles_per_volley += 1

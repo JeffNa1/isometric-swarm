@@ -10,3 +10,7 @@ script = ExtResource("1_swarm")
 [node name="ScoutMM" type="MultiMeshInstance2D" parent="."]
 
 [node name="BruteMM" type="MultiMeshInstance2D" parent="."]
+
+[node name="SpitterMM" type="MultiMeshInstance2D" parent="."]
+
+[node name="ExploderMM" type="MultiMeshInstance2D" parent="."]

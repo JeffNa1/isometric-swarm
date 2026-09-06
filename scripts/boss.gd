@@ -157,7 +157,12 @@ func take_damage(amount: float) -> void:
 	if current_health <= 0.0:
 		_die()
 
+var is_dead: bool = false
+
 func _die() -> void:
+	if is_dead:
+		return
+	is_dead = true
 	boss_defeated.emit()
 
 	if hud and hud.has_method("hide_boss_bar"):

@@ -11,6 +11,7 @@ const MORTAR_CANISTER_SCENE = preload("res://scenes/weapons/mortar_canister.tscn
 
 var fire_timer: float = 0.0
 var swarm_mgr: Node2D = null
+var player_ref: CharacterBody2D = null
 var is_evolved: bool = false
 
 func _ready() -> void:
@@ -20,13 +21,17 @@ func _get_managers() -> void:
 	var cur = get_tree().current_scene
 	if cur:
 		swarm_mgr = cur.get_node_or_null("SwarmManager")
+		player_ref = cur.get_node_or_null("Entities/Player")
 
 func _process(delta: float) -> void:
-	if not swarm_mgr:
+	if not swarm_mgr or not player_ref:
 		_get_managers()
 
+	var cd_mult = player_ref.cooldown_reduction if (player_ref and "cooldown_reduction" in player_ref) else 0.0
+	var actual_rate = max(0.4, fire_rate * (1.0 - cd_mult))
+
 	fire_timer += delta
-	if fire_timer >= fire_rate:
+	if fire_timer >= actual_rate:
 		fire_timer = 0.0
 		_attempt_fire()
 
@@ -35,46 +40,49 @@ func _attempt_fire() -> void:
 		return
 
 	var origin = global_position
-	# Find dense cluster targets or random enemy
-	var sample_limit = min(swarm_mgr.active_count, 70)
 	var candidates: Array[Vector2] = []
+	var nearby = swarm_mgr.spatial_grid.get_nearby(origin, attack_range)
 
-	for i in range(sample_limit):
-		var pos = swarm_mgr.positions[i]
-		var d = origin.distance_to(pos)
-		if d <= attack_range and d > 80.0:
-			candidates.append(pos)
+	for idx in nearby:
+		if idx < swarm_mgr.active_count:
+			var pos = swarm_mgr.positions[idx]
+			var d = origin.distance_to(pos)
+			if d <= attack_range and d > 60.0:
+				candidates.append(pos)
 
 	if candidates.is_empty():
 		return
 
 	candidates.shuffle()
 
+	var dmg_mult = player_ref.damage_multiplier if (player_ref and "damage_multiplier" in player_ref) else 1.0
+	var final_damage = damage * dmg_mult
+	var final_pool_dmg = pool_damage * dmg_mult
+
 	var shots = min(canister_count, candidates.size())
 	for i in range(shots):
 		var target_pos = candidates[i]
-		# Add slight scatter offset for multiple canisters
 		if i > 0:
 			target_pos += Vector2(randf_range(-60.0, 60.0), randf_range(-40.0, 40.0))
-		_spawn_canister(target_pos)
+		_spawn_canister(target_pos, final_damage, final_pool_dmg)
 
-func _spawn_canister(target: Vector2) -> void:
+func _spawn_canister(target: Vector2, d: float, pd: float) -> void:
 	var canister = MORTAR_CANISTER_SCENE.instantiate()
 	var entities = get_tree().current_scene.get_node_or_null("Entities")
 	if not entities:
 		entities = get_parent()
 
 	entities.add_child(canister)
-	canister.setup(global_position, target, damage, pool_damage, pool_radius, is_evolved)
+	canister.setup(global_position, target, d, pd, pool_radius, is_evolved)
 
 func evolve_chernobyl() -> void:
 	is_evolved = true
-	canister_count = 4
-	damage = 135.0
-	pool_damage = 55.0
+	canister_count = 3
+	damage = 140.0
+	pool_damage = 42.0
 	fire_rate = 0.95
-	pool_radius = 95.0
-	attack_range = 750.0
+	pool_radius = 85.0
+	attack_range = 700.0
 
 func upgrade_mortar() -> void:
 	canister_count = min(3, canister_count + 1)

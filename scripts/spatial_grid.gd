@@ -17,9 +17,6 @@ var entity_cell_y: PackedInt32Array = PackedInt32Array()
 var occupied_hashes: PackedInt32Array = PackedInt32Array()
 var occupied_count: int = 0
 
-# Persistent query buffer to eliminate heap allocations
-var query_buffer: Array[int] = []
-
 func _init(p_cell_size: float = 90.0, initial_capacity: int = 6000) -> void:
 	cell_size = p_cell_size
 	inv_cell_size = 1.0 / p_cell_size
@@ -27,7 +24,8 @@ func _init(p_cell_size: float = 90.0, initial_capacity: int = 6000) -> void:
 	cell_head.resize(TABLE_SIZE)
 	cell_head.fill(-1)
 
-	occupied_hashes.resize(2048)
+	# Pre-allocate large buffer to eliminate re-allocation during physics frames
+	occupied_hashes.resize(8192)
 	_ensure_capacity(initial_capacity)
 
 func _ensure_capacity(capacity: int) -> void:
@@ -64,8 +62,9 @@ func insert(index: int, pos: Vector2) -> void:
 	entity_next[index] = cell_head[h]
 	cell_head[h] = index
 
+# Returns independent array to prevent buffer corruption on nested calls (e.g. Tesla chain)
 func get_nearby(pos: Vector2, search_radius: float) -> Array[int]:
-	query_buffer.clear()
+	var result: Array[int] = []
 	var min_cx: int = int(floor((pos.x - search_radius) * inv_cell_size))
 	var max_cx: int = int(floor((pos.x + search_radius) * inv_cell_size))
 	var min_cy: int = int(floor((pos.y - search_radius) * inv_cell_size))
@@ -77,9 +76,9 @@ func get_nearby(pos: Vector2, search_radius: float) -> Array[int]:
 			var curr: int = cell_head[h]
 			while curr != -1:
 				if entity_cell_x[curr] == cx and entity_cell_y[curr] == cy:
-					query_buffer.append(curr)
+					result.append(curr)
 				curr = entity_next[curr]
-	return query_buffer
+	return result
 
 const ADJ_DX: PackedInt32Array = [0, -1, 0, 1, -1, 1, -1, 0, 1]
 const ADJ_DY: PackedInt32Array = [0, -1, -1, -1, 0, 0, 1, 1, 1]
@@ -111,7 +110,7 @@ func calculate_separation(pos: Vector2, rad_i: float, my_idx: int, positions: Pa
 	return sep
 
 func get_in_cell_and_adjacent(pos: Vector2) -> Array[int]:
-	query_buffer.clear()
+	var result: Array[int] = []
 	var cx: int = int(floor(pos.x * inv_cell_size))
 	var cy: int = int(floor(pos.y * inv_cell_size))
 
@@ -122,6 +121,6 @@ func get_in_cell_and_adjacent(pos: Vector2) -> Array[int]:
 		var curr: int = cell_head[h]
 		while curr != -1:
 			if entity_cell_x[curr] == ncx and entity_cell_y[curr] == ncy:
-				query_buffer.append(curr)
+				result.append(curr)
 			curr = entity_next[curr]
-	return query_buffer
+	return result

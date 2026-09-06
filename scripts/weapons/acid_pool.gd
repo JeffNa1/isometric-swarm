@@ -15,6 +15,7 @@ var sound_timer: float = 0.0
 var swarm_mgr: Node2D = null
 var sound_mgr: Node = null
 var particle_mgr: Node2D = null
+var player_ref: CharacterBody2D = null
 
 static var pool_tex: ImageTexture = null
 
@@ -32,6 +33,7 @@ func _get_managers() -> void:
 		swarm_mgr = cur.get_node_or_null("SwarmManager")
 		sound_mgr = cur.get_node_or_null("SoundManager")
 		particle_mgr = cur.get_node_or_null("ParticleManager")
+		player_ref = cur.get_node_or_null("Entities/Player")
 
 func setup(p_duration: float, p_damage: float, p_radius: float, p_evolved: bool = false) -> void:
 	duration = p_duration
@@ -40,7 +42,7 @@ func setup(p_duration: float, p_damage: float, p_radius: float, p_evolved: bool 
 	is_evolved = p_evolved
 
 func _process(delta: float) -> void:
-	if not swarm_mgr:
+	if not swarm_mgr or not player_ref:
 		_get_managers()
 
 	time_alive += delta
@@ -53,7 +55,9 @@ func _process(delta: float) -> void:
 	if tick_timer >= 0.25:
 		tick_timer = 0.0
 		if swarm_mgr and swarm_mgr.active_count > 0:
-			swarm_mgr.damage_in_radius(global_position, radius, damage_per_tick, 8.0)
+			var hits = swarm_mgr.damage_in_radius(global_position, radius, damage_per_tick, 8.0)
+			if hits > 0 and player_ref and player_ref.has_method("record_weapon_damage"):
+				player_ref.record_weapon_damage("mortar", damage_per_tick * hits)
 
 	# Sound tick
 	sound_timer += delta
