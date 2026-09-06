@@ -163,35 +163,35 @@ func spawn_enemy(spawn_pos: Vector2, enemy_type: int) -> bool:
 
 	match enemy_type:
 		1: # Scout (Electric Violet)
-			var base_hp = 11.0 * hp_mult
+			var base_hp = 18.0 * hp_mult
 			max_healths[idx] = base_hp
 			healths[idx] = base_hp
 			speeds[idx] = 185.0 * spd_mult
 			radii[idx] = 10.0
 			damages[idx] = 5.0 * dmg_mult
 		2: # Brute (Volcanic Behemoth)
-			var base_hp = 160.0 * hp_mult
+			var base_hp = 220.0 * hp_mult
 			max_healths[idx] = base_hp
 			healths[idx] = base_hp
 			speeds[idx] = 75.0 * spd_mult
 			radii[idx] = 24.0
 			damages[idx] = 22.0 * dmg_mult
 		3: # Spitter (Toxic Green Ranged)
-			var base_hp = 32.0 * hp_mult
+			var base_hp = 42.0 * hp_mult
 			max_healths[idx] = base_hp
 			healths[idx] = base_hp
 			speeds[idx] = 95.0 * spd_mult
 			radii[idx] = 13.0
 			damages[idx] = 8.0 * dmg_mult
 		4: # Exploder (Kamikaze Orange)
-			var base_hp = 16.0 * hp_mult
+			var base_hp = 22.0 * hp_mult
 			max_healths[idx] = base_hp
 			healths[idx] = base_hp
 			speeds[idx] = 215.0 * spd_mult
 			radii[idx] = 11.0
 			damages[idx] = 45.0 * dmg_mult
 		_: # 0: Crawler (Crimson Popcorn)
-			var base_hp = 16.0 * hp_mult
+			var base_hp = 22.0 * hp_mult
 			max_healths[idx] = base_hp
 			healths[idx] = base_hp
 			speeds[idx] = 120.0 * spd_mult
@@ -606,7 +606,7 @@ func _kill_enemy(idx: int) -> void:
 	var e_type = types[idx]
 	var is_brute = (e_type == 2)
 	var is_boss = is_brute
-	var xp = 45 if is_brute else (12 if e_type == 3 else (4 if e_type == 4 else (5 if e_type == 1 else 2)))
+	var xp = 22 if is_brute else (7 if e_type == 3 else (3 if e_type == 4 else (2 if e_type == 1 else 1)))
 	enemy_killed.emit(xp, pos, is_brute)
 
 	if sound_mgr and randf() < 0.4:

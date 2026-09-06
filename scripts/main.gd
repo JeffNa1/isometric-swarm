@@ -201,10 +201,16 @@ func _process_spawn_director(delta: float) -> void:
 
 	# Phase 1: 00:00 - 01:30 | Early Swarm (Crawlers)
 	if elapsed_time < 90.0:
-		if spawn_timer >= 0.90:
-			spawn_timer = 0.0
-			if swarm_mgr.active_count < 450:
-				_spawn_wave_cluster(randi_range(30, 55), 0)
+		if elapsed_time < 40.0:
+			if spawn_timer >= 1.35:
+				spawn_timer = 0.0
+				if swarm_mgr.active_count < 95:
+					_spawn_wave_cluster(randi_range(10, 18), 0)
+		else:
+			if spawn_timer >= 1.05:
+				spawn_timer = 0.0
+				if swarm_mgr.active_count < 220:
+					_spawn_wave_cluster(randi_range(18, 32), 0)
 
 	# Phase 2: 01:30 - 03:00 | Scout Swarm Flankers
 	elif elapsed_time < 180.0:
@@ -212,11 +218,11 @@ func _process_spawn_director(delta: float) -> void:
 			surge_triggered = true
 			_trigger_swarm_surge()
 
-		if spawn_timer >= 0.70:
+		if spawn_timer >= 0.85:
 			spawn_timer = 0.0
-			if swarm_mgr.active_count < 1500:
-				var e_type = 1 if randf() < 0.4 else 0
-				_spawn_wave_cluster(randi_range(60, 110), e_type)
+			if swarm_mgr.active_count < 750:
+				var e_type = 1 if randf() < 0.35 else 0
+				_spawn_wave_cluster(randi_range(35, 65), e_type)
 
 	# Phase 3: 03:00 - 05:00 | Toxic Spitters & Brutes
 	elif elapsed_time < 300.0:
@@ -440,7 +446,7 @@ func _on_enemy_killed(xp_val: int, pos: Vector2, is_boss: bool) -> void:
 			next_combo_milestone = 5
 
 	# Spawn Gem with cluster consolidation
-	if randf() < 0.75 or is_boss:
+	if randf() < 0.45 or is_boss:
 		spawn_gem(pos, xp_val, is_boss)
 
 	# Mini-Boss Chest Drop (2.5% chance from Brute mini-bosses)

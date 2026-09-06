@@ -137,8 +137,9 @@ func _apply_operative_traits() -> void:
 		"pyro":
 			max_health *= 1.15
 			if flame_weapon and "flame_range" in flame_weapon:
-				flame_weapon.flame_range *= 1.25
-				flame_weapon.flame_angle += 15.0
+				flame_weapon.flame_range *= 1.15
+				flame_weapon.flame_angle += 8.0
+				flame_weapon.damage_per_tick *= 1.10
 		"volt":
 			cooldown_reduction += 0.15
 			pickup_radius *= 1.20
@@ -339,7 +340,15 @@ func take_damage(amount: float) -> void:
 		player_died.emit()
 
 func get_xp_needed(lvl: int) -> int:
-	return int(45.0 + pow(float(lvl), 1.65) * 28.0)
+	if lvl == 1:
+		return 25
+	elif lvl == 2:
+		return 55
+	elif lvl == 3:
+		return 110
+	elif lvl == 4:
+		return 180
+	return int(70.0 + pow(float(lvl), 1.95) * 16.0)
 
 func add_xp(amount: int) -> void:
 	xp += amount

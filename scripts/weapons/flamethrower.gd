@@ -2,10 +2,10 @@ extends Node2D
 
 const LightHelper = preload("res://scripts/light_helper.gd")
 
-@export var damage_per_tick: float = 9.0
-@export var tick_interval: float = 0.075
-@export var flame_range: float = 260.0
-@export var flame_angle: float = 58.0
+@export var damage_per_tick: float = 3.6
+@export var tick_interval: float = 0.09
+@export var flame_range: float = 195.0
+@export var flame_angle: float = 45.0
 
 var tick_timer: float = 0.0
 var swarm_mgr: Node2D = null
@@ -172,15 +172,15 @@ func _burn_and_emit_stream() -> void:
 
 func evolve_sunstorm() -> void:
 	is_evolved = true
-	flame_range = 360.0
+	flame_range = 310.0
 	flame_angle = 360.0
-	damage_per_tick = 22.0
-	tick_interval = 0.05
+	damage_per_tick = 15.0
+	tick_interval = 0.065
 
 func upgrade_flame() -> void:
-	flame_range += 35.0
-	flame_angle += 8.0
-	damage_per_tick += 3.0
+	flame_range += 22.0
+	flame_angle += 5.0
+	damage_per_tick += 1.8
 
 func _draw() -> void:
 	for i in range(puff_count):
