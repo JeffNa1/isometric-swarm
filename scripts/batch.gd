@@ -31,6 +31,9 @@ func setup(capacity: int, shader: Shader) -> Batch:
 	mm.use_custom_data = true
 	mm.mesh = _quad()
 	mm.instance_count = cap
+	# Instances move every frame and the engine won't refresh the bounds from a
+	# raw buffer upload, so make culling never reject the batch.
+	mm.custom_aabb = AABB(Vector3(-1e6, -1e6, -1.0), Vector3(2e6, 2e6, 2.0))
 	mm.visible_instance_count = 0
 	buf.resize(cap * STRIDE)
 	multimesh = mm

@@ -109,6 +109,19 @@ func roll_offers(n: int) -> Array:
 				out.append(pool[k][0])
 				pool.remove_at(k)
 				break
+	# early on, always offer at least one new weapon so builds come online fast
+	if weapon_order.size() < 3 and n > 1:
+		var has_new_weapon := false
+		for id in out:
+			if Data.WEAPONS.has(id) and lv(id) == 0:
+				has_new_weapon = true
+		if not has_new_weapon:
+			var fresh: Array = []
+			for id in Data.WEAPONS:
+				if lv(id) == 0:
+					fresh.append(id)
+			if not fresh.is_empty():
+				out[out.size() - 1] = fresh.pick_random()
 	if out.size() < n:
 		out.append("heal")
 	if out.size() < n:
@@ -154,7 +167,7 @@ func _cooldown(id: String) -> float:
 	var l := lv(id)
 	var cd := 1.0
 	match id:
-		"pulse": cd = 0.5 * (0.85 if l >= 4 else 1.0)
+		"pulse": cd = 0.42 * (0.85 if l >= 4 else 1.0)
 		"orbit": cd = 999.0
 		"arc": cd = 1.25 * (0.7 if l >= 5 else 1.0)
 		"nova": cd = 2.8 * (0.75 if l >= 4 else 1.0)
@@ -171,13 +184,14 @@ func _fire_pulse(pp: Vector2) -> bool:
 	var target := Vector2.INF
 	if j >= 0:
 		target = game.swarm.pos[j]
-	var boss = game.nearest_boss(pp, 560.0)
-	if boss and (target == Vector2.INF or pp.distance_to(boss.position) < pp.distance_to(target)):
+	# bosses in range take priority; piercing bolts chew through the escort
+	var boss = game.nearest_boss(pp, 460.0)
+	if boss:
 		target = boss.position
 	if target == Vector2.INF:
 		return false
 	var bolts := 1 + int(l >= 2) + int(l >= 4) + 2 * int(l >= 5)
-	var dmg := 11.0 * (1.4 if l >= 3 else 1.0) * might()
+	var dmg := 12.0 * (1.4 if l >= 3 else 1.0) * might()
 	var pierce := int(l >= 3) + int(l >= 5)
 	var base := (target - pp).angle()
 	var col: Color = Data.WEAPONS.pulse.color
@@ -230,14 +244,14 @@ func _fire_arc(pp: Vector2) -> bool:
 	var jump_r := 150.0 * area()
 	var swarm = game.swarm
 	var any := false
+	var boss = game.nearest_boss(pp, 440.0)
+	if boss:
+		boss.take_damage(dmg * 2.0 * casts)
+		_arcs.append([_jagged(pp, boss.position), 0.2, Data.WEAPONS.arc.color])
+		any = true
 	for c in casts:
 		var j: int = swarm.nearest(pp, 440.0) if c == 0 else swarm.nearest(pp + Vector2.from_angle(randf() * TAU) * 200.0, 300.0)
 		if j < 0:
-			var boss = game.nearest_boss(pp, 440.0)
-			if boss:
-				boss.take_damage(dmg * 2.0)
-				_arcs.append([_jagged(pp, boss.position), 0.2, Data.WEAPONS.arc.color])
-				any = true
 			continue
 		any = true
 		var pts := PackedVector2Array([pp])
@@ -341,7 +355,7 @@ func _fire_mortar(pp: Vector2) -> bool:
 	var l := lv("mortar")
 	var center: Vector2 = game.swarm.densest(pp, 520.0)
 	var boss = game.nearest_boss(pp, 600.0)
-	if boss and randf() < 0.5:
+	if boss and randf() < 0.7:
 		center = boss.position
 	if center == Vector2.INF:
 		return false

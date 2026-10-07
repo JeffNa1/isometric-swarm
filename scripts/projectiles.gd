@@ -19,6 +19,7 @@ var e_pos := PackedVector2Array()
 var e_vel := PackedVector2Array()
 var e_dmg := PackedFloat32Array()
 var e_life := PackedFloat32Array()
+var _shot_tokens := 7.0   # swarm shots are rate-limited so crowds never become bullet hell
 
 var bolt_batch: Batch
 var enemy_batch: Batch
@@ -41,12 +42,19 @@ func shoot(p: Vector2, v: Vector2, dmg: float, pierce: int, col: Color) -> void:
 	b_pos.append(p); b_vel.append(v); b_dmg.append(dmg)
 	b_life.append(0.9); b_pierce.append(pierce); b_last.append(-1); b_col.append(col)
 
-func enemy_shoot(p: Vector2, v: Vector2, dmg: float) -> void:
+## Returns false if the shot was dropped. Boss patterns pass forced = true.
+func enemy_shoot(p: Vector2, v: Vector2, dmg: float, forced: bool = false) -> bool:
 	if e_pos.size() >= 300:
-		return
+		return false
+	if not forced:
+		if _shot_tokens < 1.0:
+			return false
+		_shot_tokens -= 1.0
 	e_pos.append(p); e_vel.append(v); e_dmg.append(dmg); e_life.append(4.5)
+	return true
 
 func update(dt: float) -> void:
+	_shot_tokens = minf(7.0, _shot_tokens + 7.0 * dt)
 	var swarm = game.swarm
 	var i := 0
 	while i < b_pos.size():

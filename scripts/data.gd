@@ -27,8 +27,9 @@ const PLAYER := {
 	"hp": 100.0,
 	"speed": 235.0,
 	"radius": 13.0,
-	"invuln": 0.55,
-	"magnet": 75.0,
+	"invuln": 0.7,
+	"regen": 0.4,
+	"magnet": 90.0,
 	"dash_time": 0.18,
 	"dash_speed": 760.0,
 	"dash_cooldown": 2.4,
@@ -43,9 +44,9 @@ const ENEMIES := [
 	# DART: fast flankers that punish standing still.
 	{"name": "Dart", "hp": 6.0, "speed": 168.0, "radius": 9.0, "dmg": 5.0, "xp": 1, "color": Color("ffc23d"), "knock": 1.2},
 	# BRUTE: slow walls of meat. Shrug off knockback.
-	{"name": "Brute", "hp": 70.0, "speed": 58.0, "radius": 19.0, "dmg": 16.0, "xp": 6, "color": Color("ff5a3d"), "knock": 0.25},
+	{"name": "Brute", "hp": 70.0, "speed": 58.0, "radius": 19.0, "dmg": 14.0, "xp": 6, "color": Color("ff5a3d"), "knock": 0.25},
 	# SPITTER: keeps its distance and lobs slow, readable shots.
-	{"name": "Spitter", "hp": 20.0, "speed": 72.0, "radius": 12.0, "dmg": 10.0, "xp": 3, "color": Color("a6ff3d"), "knock": 0.8},
+	{"name": "Spitter", "hp": 20.0, "speed": 72.0, "radius": 12.0, "dmg": 8.0, "xp": 3, "color": Color("a6ff3d"), "knock": 0.8},
 	# BOMBER: rushes in, fuses, explodes. Also hurts its friends.
 	{"name": "Bomber", "hp": 14.0, "speed": 118.0, "radius": 11.0, "dmg": 22.0, "xp": 2, "color": Color("ff8a1a"), "knock": 0.8},
 	# ELITE: a champion mite. Drops a supply cache.
@@ -56,28 +57,28 @@ const ENEMIES := [
 const SPAWN_TABLE := [
 	{"type": E.MITE, "from": 0.0, "weight": 10.0},
 	{"type": E.DART, "from": 45.0, "weight": 3.5},
-	{"type": E.BRUTE, "from": 120.0, "weight": 1.2},
-	{"type": E.SPITTER, "from": 170.0, "weight": 1.6},
+	{"type": E.BRUTE, "from": 120.0, "weight": 0.8},
+	{"type": E.SPITTER, "from": 170.0, "weight": 0.9},
 	{"type": E.BOMBER, "from": 260.0, "weight": 2.0},
 ]
 
 ## How many enemies the director tries to keep alive at time t.
 static func target_population(t: float) -> float:
 	var m := t / 60.0
-	return 90.0 + 270.0 * m + 14.0 * m * m
+	return 90.0 + 240.0 * m + 14.0 * m * m
 
 ## Enemy HP multiplier at time t. Player power outpaces this when building well.
 static func hp_scale(t: float) -> float:
 	var m := t / 60.0
-	return 1.0 + 0.22 * m + 0.035 * m * m
+	return 1.0 + 0.25 * m + 0.06 * m * m
 
 static func dmg_scale(t: float) -> float:
-	return 1.0 + 0.06 * (t / 60.0)
+	return 1.0 + 0.08 * (t / 60.0)
 
 # ---------------------------------------------------------------- xp
 static func xp_to_next(level: int) -> int:
 	var l := float(level - 1)
-	return int(round(10.0 + 12.0 * l + 2.5 * l * l))
+	return int(round(8.0 + 8.0 * l + 0.8 * l * l + 0.06 * l * l * l))
 
 # ---------------------------------------------------------------- upgrades
 const MAX_LEVEL := 5

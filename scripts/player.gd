@@ -75,7 +75,7 @@ func update(dt: float) -> void:
 	invuln = maxf(0.0, invuln - dt)
 	dash_cd = maxf(0.0, dash_cd - dt)
 	hurt_flash = maxf(0.0, hurt_flash - dt * 4.0)
-	hp = minf(max_hp, hp + game.weapons.regen() * dt)
+	hp = minf(max_hp, hp + (Data.PLAYER.regen + game.weapons.regen()) * dt)
 
 	if dash_t > 0.0:
 		dash_t -= dt

@@ -21,6 +21,7 @@ var g_vel := PackedVector2Array()
 var g_val := PackedInt32Array()
 var g_fly := PackedByteArray()
 var g_phase := PackedFloat32Array()
+var g_age := PackedFloat32Array()
 
 # items: [pos, kind, phase, flying, vel]
 var items: Array = []
@@ -33,7 +34,7 @@ func setup(g: Node) -> void:
 	add_child(batch)
 
 func clear() -> void:
-	for a in [g_pos, g_vel, g_val, g_fly, g_phase]:
+	for a in [g_pos, g_vel, g_val, g_fly, g_phase, g_age]:
 		a.clear()
 	items.clear()
 
@@ -51,8 +52,8 @@ func drop_gem(p: Vector2, value: int) -> void:
 	if n >= SOFT_CAP:
 		# fold into a nearby idle crystal
 		var best := -1
-		var best_d := 140.0 * 140.0 if n < HARD_CAP else INF
-		for k in range(n - 1, maxi(-1, n - 60), -1):
+		var best_d := 240.0 * 240.0 if n < HARD_CAP else INF
+		for k in range(n - 1, maxi(-1, n - 120), -1):
 			if g_fly[k] == 1:
 				continue
 			var d := g_pos[k].distance_squared_to(p)
@@ -70,6 +71,7 @@ func drop_gem(p: Vector2, value: int) -> void:
 	g_val.append(value)
 	g_fly.append(0)
 	g_phase.append(randf())
+	g_age.append(0.0)
 
 func drop_item(p: Vector2, kind: int) -> void:
 	items.append([p, kind, randf(), false, Vector2.ZERO])
@@ -91,6 +93,12 @@ func update(dt: float) -> void:
 	while i < g_pos.size():
 		var p := g_pos[i]
 		var d_sq := p.distance_squared_to(pp)
+		g_age[i] += dt
+		# crystals left lying around slowly drift to the player so a crowded
+		# floor never starves the build
+		if g_fly[i] == 0 and g_age[i] > 8.0:
+			p += (pp - p).normalized() * minf(60.0 + (g_age[i] - 8.0) * 25.0, 260.0) * dt
+			g_pos[i] = p
 		if g_fly[i] == 0 and d_sq < mag_sq:
 			g_fly[i] = 1
 			g_vel[i] = (p - pp).normalized() * 160.0  # little hop away first
@@ -104,9 +112,9 @@ func update(dt: float) -> void:
 			game.gain_xp(g_val[i])
 			var last := g_pos.size() - 1
 			g_pos[i] = g_pos[last]; g_vel[i] = g_vel[last]; g_val[i] = g_val[last]
-			g_fly[i] = g_fly[last]; g_phase[i] = g_phase[last]
+			g_fly[i] = g_fly[last]; g_phase[i] = g_phase[last]; g_age[i] = g_age[last]
 			g_pos.resize(last); g_vel.resize(last); g_val.resize(last)
-			g_fly.resize(last); g_phase.resize(last)
+			g_fly.resize(last); g_phase.resize(last); g_age.resize(last)
 			continue
 		i += 1
 	if collected > 0:

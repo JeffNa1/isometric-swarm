@@ -332,8 +332,18 @@ func _surge() -> void:
 	var n := clampi(int(70 + elapsed * 0.5), 70, 380)
 	var type := Data.E.MITE if elapsed < 150.0 else (Data.E.DART if randf() < 0.4 else Data.E.MITE)
 	var r := view_radius() * 0.98
+	# two or three escape lanes so a sharp player (or a dash) can break out
+	var gaps: Array[float] = []
+	for g in randi_range(2, 3):
+		gaps.append(randf() * TAU)
 	for k in n:
 		var a := TAU * k / float(n)
+		var blocked := false
+		for g in gaps:
+			if absf(angle_difference(a, g)) < 0.16:
+				blocked = true
+		if blocked:
+			continue
 		swarm.spawn(player.position + Vector2.from_angle(a) * (r + randf_range(-10.0, 30.0)), type, elapsed, 0.8)
 	hud.banner("SWARM SURGE", "They're closing in from every side", Data.C_HP)
 	Sfx.play("alarm")
@@ -470,6 +480,7 @@ func _open_level_up() -> void:
 
 func _on_upgrade_chosen(id: String) -> void:
 	weapons.add_upgrade(id)
+	player.hp = minf(player.max_hp, player.hp + player.max_hp * 0.08)
 	pending_levels -= 1
 	if pending_levels > 0:
 		level_up_ui.open(weapons.roll_offers(3))

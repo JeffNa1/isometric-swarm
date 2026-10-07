@@ -30,13 +30,13 @@ func setup(g: Node, t: int) -> void:
 	if tier == 1:
 		title = "BROODMOTHER"
 		radius = 46.0
-		max_hp = 9000.0
+		max_hp = 6500.0
 		speed = 74.0
 		color = Color("ff3d81")
 	else:
 		title = "HIVE QUEEN"
 		radius = 62.0
-		max_hp = 42000.0
+		max_hp = 30000.0
 		speed = 84.0
 		contact = 32.0
 		color = Color("c47dff")
@@ -112,7 +112,7 @@ func update(dt: float) -> void:
 				var arms := 3 if tier == 1 else 5
 				for a in arms:
 					var ang := _spiral + TAU * float(a) / float(arms)
-					game.projectiles.enemy_shoot(position + Vector2.from_angle(ang) * radius, Vector2.from_angle(ang) * 150.0, contact * 0.5)
+					game.projectiles.enemy_shoot(position + Vector2.from_angle(ang) * radius, Vector2.from_angle(ang) * 150.0, contact * 0.5, true)
 				_spiral += 0.21
 			if _state_t >= 1.6:
 				_end_attack()
@@ -130,14 +130,14 @@ func _end_attack() -> void:
 func _radial(n: int, spd: float, offset: float = 0.0) -> void:
 	for k in n:
 		var a := TAU * float(k) / float(n) + offset + _t
-		game.projectiles.enemy_shoot(position + Vector2.from_angle(a) * radius, Vector2.from_angle(a) * spd, contact * 0.5)
+		game.projectiles.enemy_shoot(position + Vector2.from_angle(a) * radius, Vector2.from_angle(a) * spd, contact * 0.5, true)
 	game.fx.ring(position, radius * 2.2, color, 0.4, 8.0, radius)
 	Sfx.play("nova", 0.6)
 
 func _aimed_fan(dir: Vector2) -> void:
 	for k in 9:
 		var a := dir.angle() + (float(k) - 4.0) * 0.12
-		game.projectiles.enemy_shoot(position + Vector2.from_angle(a) * radius, Vector2.from_angle(a) * 210.0, contact * 0.5)
+		game.projectiles.enemy_shoot(position + Vector2.from_angle(a) * radius, Vector2.from_angle(a) * 210.0, contact * 0.5, true)
 	Sfx.play("zap", 0.6)
 
 func _spawn_brood() -> void:

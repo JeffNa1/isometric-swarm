@@ -59,6 +59,7 @@ func setup(g: Node, capacity: int) -> void:
 	cell_head.resize(GW * GH)
 	cell_count.resize(GW * GH)
 	cell_sum.resize(GW * GH)
+	cell_head.fill(-1)
 	batch = Batch.new().setup(cap, SwarmShader)
 	add_child(batch)
 
@@ -133,10 +134,10 @@ func update(dt: float, player_pos: Vector2, player_r: float) -> void:
 				desired = -dir * spd * 0.7
 			elif dist < 300.0:
 				desired = Vector2(-dir.y, dir.x) * spd * (0.6 if phase[i] > 0.5 else -0.6)
-			if timer[i] <= 0.0 and dist < 460.0:
-				timer[i] = randf_range(2.6, 3.4)
-				game.projectiles.enemy_shoot(p + dir * r, dir * 175.0, dmg[i])
-				flash[i] = 0.4
+			if timer[i] <= 0.0 and dist < 360.0:
+				timer[i] = randf_range(3.2, 4.4)
+				if game.projectiles.enemy_shoot(p + dir * r, dir * 175.0, dmg[i]):
+					flash[i] = 0.4
 		elif k == Data.E.BOMBER:
 			if timer[i] > 0.0:
 				timer[i] -= dt
