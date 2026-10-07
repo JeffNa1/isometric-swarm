@@ -58,7 +58,7 @@ const SPAWN_TABLE := [
 	{"type": E.MITE, "from": 0.0, "weight": 10.0},
 	{"type": E.DART, "from": 45.0, "weight": 3.5},
 	{"type": E.BRUTE, "from": 120.0, "weight": 0.8},
-	{"type": E.SPITTER, "from": 170.0, "weight": 0.9},
+	{"type": E.SPITTER, "from": 170.0, "weight": 0.7},
 	{"type": E.BOMBER, "from": 260.0, "weight": 2.0},
 ]
 

@@ -136,7 +136,7 @@ func update(dt: float, player_pos: Vector2, player_r: float) -> void:
 				desired = Vector2(-dir.y, dir.x) * spd * (0.6 if phase[i] > 0.5 else -0.6)
 			if timer[i] <= 0.0 and dist < 360.0:
 				timer[i] = randf_range(3.2, 4.4)
-				if game.projectiles.enemy_shoot(p + dir * r, dir * 175.0, dmg[i]):
+				if game.projectiles.enemy_shoot(p + dir * r, dir * 150.0, dmg[i]):
 					flash[i] = 0.4
 		elif k == Data.E.BOMBER:
 			if timer[i] > 0.0:

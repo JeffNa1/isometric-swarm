@@ -19,7 +19,7 @@ var e_pos := PackedVector2Array()
 var e_vel := PackedVector2Array()
 var e_dmg := PackedFloat32Array()
 var e_life := PackedFloat32Array()
-var _shot_tokens := 7.0   # swarm shots are rate-limited so crowds never become bullet hell
+var _shot_tokens := 4.0   # swarm shots are rate-limited so crowds never become bullet hell
 
 var bolt_batch: Batch
 var enemy_batch: Batch
@@ -54,7 +54,7 @@ func enemy_shoot(p: Vector2, v: Vector2, dmg: float, forced: bool = false) -> bo
 	return true
 
 func update(dt: float) -> void:
-	_shot_tokens = minf(7.0, _shot_tokens + 7.0 * dt)
+	_shot_tokens = minf(4.0, _shot_tokens + 4.0 * dt)
 	var swarm = game.swarm
 	var i := 0
 	while i < b_pos.size():
