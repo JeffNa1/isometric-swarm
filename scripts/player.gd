@@ -1,671 +1,198 @@
-extends CharacterBody2D
+extends Node2D
+## The hover-drone you pilot. Keyboard / gamepad / virtual stick movement,
+## a dash with i-frames, short invulnerability after hits, and procedural art.
 
-const LightHelper = preload("res://scripts/light_helper.gd")
-const SpriteFactory = preload("res://scripts/sprite_factory.gd")
-const SaveManagerClass = preload("res://scripts/save_manager.gd")
+signal died
 
-signal health_changed(current: float, maximum: float)
-signal xp_changed(current: int, target: int, lvl: int)
-signal leveled_up(new_level: int)
-signal player_died()
+var game: Node
+var radius: float = Data.PLAYER.radius
+var max_hp: float = Data.PLAYER.hp
+var hp: float = Data.PLAYER.hp
+var speed: float = Data.PLAYER.speed
+var magnet: float = Data.PLAYER.magnet
+var vel := Vector2.ZERO
+var facing := Vector2.RIGHT
+var invuln := 0.0
+var dash_t := 0.0
+var dash_cd := 0.0
+var dash_dir := Vector2.RIGHT
+var hurt_flash := 0.0
+var alive := true
+var stick := Vector2.ZERO   # set by the touch joystick
+var _recoil := Vector2.ZERO
+var _trail: Array = []
+var _t := 0.0
 
-@export var max_health: float = 100.0
-@export var base_speed: float = 250.0
+func setup(g: Node) -> void:
+	game = g
+	z_index = 2
+	scale = Vector2(1.3, 1.3)
 
-var current_health: float = 100.0
-var move_speed: float = 250.0
-var pickup_radius: float = 48.0
-var armor: float = 0.0
-var regen_rate: float = 0.0
-var damage_multiplier: float = 1.0
-var cooldown_reduction: float = 0.0
-var crit_chance: float = 0.0
+func reset() -> void:
+	position = Vector2.ZERO
+	vel = Vector2.ZERO
+	alive = true
+	invuln = 1.0
+	dash_cd = 0.0
+	dash_t = 0.0
+	_trail.clear()
+	refresh_stats()
+	hp = max_hp
+	visible = true
 
-var xp: int = 0
-var level: int = 1
-var xp_to_next: int = 73
+func refresh_stats() -> void:
+	var w = game.weapons
+	var old_max := max_hp
+	max_hp = Data.PLAYER.hp + w.max_hp_bonus()
+	if max_hp > old_max:
+		hp += max_hp - old_max
+	speed = Data.PLAYER.speed * w.move_mult()
+	magnet = Data.PLAYER.magnet * w.magnet_mult()
 
-var walk_cycle: float = 0.0
-var facing_right: bool = true
-var is_invulnerable: bool = false
-var invuln_timer: float = 0.0
-var hurt_flash_timer: float = 0.0
-var hurt_sfx_timer: float = 0.0
+func dash_cooldown() -> float:
+	return Data.PLAYER.dash_cooldown * game.weapons.dash_cd_mult()
 
-var sound_mgr: Node = null
-var camera_node: Camera2D = null
-var particle_mgr: Node2D = null
-
-@onready var aura_light: PointLight2D = $AuraLight
-@onready var railgun_weapon: Node2D = $Weapons/Railgun
-@onready var flame_weapon: Node2D = $Weapons/Flamethrower
-@onready var shockwave_weapon: Node2D = $Weapons/Shockwave
-@onready var missile_weapon: Node2D = $Weapons/MagicMissile
-@onready var blade_weapon: Node2D = $Weapons/BladeOrbit
-@onready var tesla_weapon: Node2D = $Weapons/TeslaCoil
-@onready var mortar_weapon: Node2D = $Weapons/BioMortar
-
-var player_frames: Array[ImageTexture] = []
-var active_frame: int = 0
-var recoil_offset: Vector2 = Vector2.ZERO
-var sprite_scale: Vector2 = Vector2.ONE
-var step_accumulator: float = 0.0
-var overclock_timer: float = 0.0
-var hit_stop_cooldown: float = 0.0
-
-# Operative class trait
-var operative_id: String = "vex"
-
-# Damage contribution tracking for Run Debriefing
-var weapon_damage_dealt: Dictionary = {
-	"railgun": 0.0,
-	"flame": 0.0,
-	"shockwave": 0.0,
-	"missile": 0.0,
-	"blade": 0.0,
-	"tesla": 0.0,
-	"mortar": 0.0
-}
-
-# --- Incremental Progression Inventories ---
-var weapon_levels = {
-	"railgun": 0,
-	"flame": 0,
-	"shockwave": 0,
-	"missile": 0,
-	"blade": 0,
-	"tesla": 0,
-	"mortar": 0
-}
-
-var passive_levels = {
-	"energy_core": 0,
-	"nano_armor": 0,
-	"thrusters": 0,
-	"magnet": 0,
-	"amp": 0
-}
-
-var evolved_weapons = {
-	"railgun": false,
-	"flame": false,
-	"shockwave": false,
-	"missile": false,
-	"blade": false,
-	"tesla": false,
-	"mortar": false
-}
-
-func _ready() -> void:
-	var bindings = {
-		"move_left": [KEY_A, KEY_LEFT],
-		"move_right": [KEY_D, KEY_RIGHT],
-		"move_up": [KEY_W, KEY_UP],
-		"move_down": [KEY_S, KEY_DOWN]
-	}
-	for action in bindings.keys():
-		if not InputMap.has_action(action):
-			InputMap.add_action(action)
-			for k in bindings[action]:
-				var ev = InputEventKey.new()
-				ev.keycode = k
-				InputMap.action_add_event(action, ev)
-
-	SaveManagerClass.init_and_load()
-	operative_id = SaveManagerClass.selected_operative
-
-	_apply_meta_progression()
-	_apply_operative_traits()
-
-	current_health = max_health
-	xp_to_next = get_xp_needed(level)
-	health_changed.emit(current_health, max_health)
-	xp_changed.emit(xp, xp_to_next, level)
-
-	player_frames = SpriteFactory.create_operative_frames(operative_id)
-	
-	if aura_light:
-		aura_light.texture = LightHelper.get_radial_texture(128)
-		aura_light.energy = 0.95
-		match operative_id:
-			"pyro": aura_light.color = Color(1.4, 0.6, 0.15, 1.0)
-			"volt": aura_light.color = Color(1.3, 1.2, 0.3, 1.0)
-			"colossus": aura_light.color = Color(0.2, 1.3, 0.6, 1.0)
-			_: aura_light.color = Color(0.25, 0.7, 1.2, 1.0)
-
-	_setup_initial_weapons()
-	_get_managers()
-	queue_redraw()
-
-func _apply_meta_progression() -> void:
-	max_health += SaveManagerClass.get_bonus("max_health")
-	armor += SaveManagerClass.get_bonus("armor")
-	regen_rate += SaveManagerClass.get_bonus("regen")
-	move_speed = base_speed * (1.0 + SaveManagerClass.get_bonus("move_speed"))
-	pickup_radius = 48.0 * (1.0 + SaveManagerClass.get_bonus("magnet"))
-	damage_multiplier = 1.0 + SaveManagerClass.get_bonus("damage")
-	cooldown_reduction = SaveManagerClass.get_bonus("cooldown")
-	crit_chance = SaveManagerClass.get_bonus("crit")
-
-func _apply_operative_traits() -> void:
-	match operative_id:
-		"pyro":
-			max_health *= 1.15
-			if flame_weapon and "flame_range" in flame_weapon:
-				flame_weapon.flame_range *= 1.15
-				flame_weapon.flame_angle += 8.0
-				flame_weapon.damage_per_tick *= 1.10
-		"volt":
-			cooldown_reduction += 0.15
-			pickup_radius *= 1.20
-		"colossus":
-			max_health += 50.0
-			armor += 4.0
-			move_speed *= 0.90
-		_: # "vex"
-			move_speed *= 1.15
-			crit_chance += 0.10
-			damage_multiplier *= 1.05
-
-func _setup_initial_weapons() -> void:
-	# Disable all first
-	_set_weapon_active(railgun_weapon, false)
-	_set_weapon_active(flame_weapon, false)
-	_set_weapon_active(shockwave_weapon, false)
-	_set_weapon_active(missile_weapon, false)
-	_set_weapon_active(blade_weapon, false)
-	_set_weapon_active(tesla_weapon, false)
-	_set_weapon_active(mortar_weapon, false)
-
-	# Enable operative starting weapon
-	match operative_id:
-		"pyro":
-			weapon_levels["flame"] = 1
-			_set_weapon_active(flame_weapon, true)
-		"volt":
-			weapon_levels["tesla"] = 1
-			_set_weapon_active(tesla_weapon, true)
-		"colossus":
-			weapon_levels["blade"] = 1
-			_set_weapon_active(blade_weapon, true)
-		_: # "vex"
-			weapon_levels["railgun"] = 1
-			_set_weapon_active(railgun_weapon, true)
-
-func record_weapon_damage(w_id: String, dmg: float) -> void:
-	if weapon_damage_dealt.has(w_id):
-		weapon_damage_dealt[w_id] += dmg
-	var cur = get_tree().current_scene
-	var dps_m = cur.get_node_or_null("SandboxLayer/DPSMeter") if cur else null
-	if dps_m and dps_m.has_method("record_damage"):
-		dps_m.record_damage(dmg)
-
-func _set_weapon_active(weapon_node: Node2D, active: bool) -> void:
-	if weapon_node:
-		weapon_node.visible = active
-		weapon_node.set_process(active)
-		weapon_node.set_physics_process(active)
-
-func _get_managers() -> void:
-	var cur = get_tree().current_scene
-	if cur:
-		sound_mgr = cur.get_node_or_null("SoundManager")
-		camera_node = cur.get_node_or_null("Camera2D")
-		particle_mgr = cur.get_node_or_null("ParticleManager")
-
-func trigger_overclock(duration: float = 10.0) -> void:
-	overclock_timer = duration
-	if particle_mgr:
-		particle_mgr.spawn_sparks(global_position, Color(3.5, 3.0, 0.4, 1.0), 20)
-
-func _physics_process(delta: float) -> void:
-	if hurt_sfx_timer > 0.0:
-		hurt_sfx_timer -= delta
-
-	if hit_stop_cooldown > 0.0:
-		hit_stop_cooldown -= delta
-
-	if invuln_timer > 0.0:
-		invuln_timer -= delta
-		if invuln_timer <= 0.0:
-			is_invulnerable = false
-
-	if overclock_timer > 0.0:
-		overclock_timer -= delta
-		if particle_mgr and randf() < 0.3:
-			particle_mgr.spawn_sparks(global_position, Color(3.5, 2.5, 0.2, 1.0), 3)
-
-	if hurt_flash_timer > 0.0:
-		hurt_flash_timer -= delta
-		queue_redraw()
-
-	if recoil_offset.length_squared() > 0.001:
-		recoil_offset = recoil_offset.move_toward(Vector2.ZERO, 70.0 * delta)
-
-	sprite_scale = sprite_scale.lerp(Vector2.ONE, 16.0 * delta)
-
-	# Health Regeneration (Nano Armor + Meta-Shop Regen)
-	var total_regen = regen_rate + (1.5 * float(passive_levels["nano_armor"]))
-	if total_regen > 0.0:
-		heal(total_regen * delta)
-
-	var input_x = Input.get_action_raw_strength("move_right") - Input.get_action_raw_strength("move_left")
-	var input_y = Input.get_action_raw_strength("move_down") - Input.get_action_raw_strength("move_up")
-	var raw_input = Vector2(input_x, input_y)
-
-	var current_spd = move_speed * (1.45 if overclock_timer > 0.0 else 1.0)
-
-	if raw_input.length_squared() > 0.0:
-		var input_norm = raw_input.normalized()
-		var iso_dir = Vector2(input_norm.x, input_norm.y * 0.75).normalized()
-		velocity = velocity.move_toward(iso_dir * current_spd, 1800.0 * delta)
-		walk_cycle += delta * (20.0 if overclock_timer > 0.0 else 14.0)
-		active_frame = int(fmod(walk_cycle, 6.0))
-		if input_x != 0.0:
-			facing_right = input_x > 0.0
-
-		# Walk cycle dynamic squash-and-stretch
-		var walk_squash = sin(walk_cycle * 2.0) * 0.06
-		sprite_scale.y = lerp(sprite_scale.y, 1.0 + walk_squash, 14.0 * delta)
-		sprite_scale.x = lerp(sprite_scale.x, 1.0 - walk_squash * 0.5, 14.0 * delta)
-
-		# Footstep dust plume
-		step_accumulator += delta * (22.0 if overclock_timer > 0.0 else 14.0)
-		if step_accumulator >= 1.0:
-			step_accumulator = 0.0
-			if particle_mgr and particle_mgr.has_method("spawn_steam_plume"):
-				particle_mgr.spawn_steam_plume(global_position + Vector2(0, 4), Color(0.4, 0.5, 0.6, 0.28), 1)
-
-		if particle_mgr and randf() < 0.35:
-			var jet_pos = global_position + Vector2(-8 if facing_right else 8, 2)
-			var jet_col = Color(3.5, 2.5, 0.4, 1.0) if overclock_timer > 0.0 else Color(0.3, 1.5, 3.0, 1.0)
-			particle_mgr.spawn_sparks(jet_pos, jet_col, 2)
-	else:
-		velocity = velocity.move_toward(Vector2.ZERO, 2000.0 * delta)
-		walk_cycle = 0.0
-		active_frame = 0
-
-	move_and_slide()
-	queue_redraw()
-
-func trigger_squash(s: Vector2) -> void:
-	sprite_scale = s
-
-func apply_recoil(dir: Vector2, force: float) -> void:
-	recoil_offset += dir.normalized() * force
-	recoil_offset = recoil_offset.limit_length(10.0)
-	trigger_squash(Vector2(0.90, 1.14))
-	queue_redraw()
-
-func trigger_hit_stop(_duration: float = 0.0) -> void:
-	# Disabled to prevent micro-stuttering and preserve silky 60 FPS
-	pass
-
-func roll_crit(base_dmg: float) -> Dictionary:
-	var is_crit = randf() < crit_chance
-	var final_dmg = base_dmg * damage_multiplier * (2.0 if is_crit else 1.0)
-	return {"damage": final_dmg, "is_crit": is_crit}
-
-func take_damage(amount: float) -> void:
-	if current_health <= 0.0 or is_invulnerable:
+func try_dash() -> void:
+	if not alive or dash_cd > 0.0 or game.paused_for_ui:
 		return
+	dash_dir = vel.normalized() if vel.length_squared() > 25.0 else facing
+	dash_t = Data.PLAYER.dash_time
+	dash_cd = dash_cooldown()
+	invuln = maxf(invuln, Data.PLAYER.dash_time + 0.12)
+	Sfx.play("dash")
+	game.fx.burst(position, Data.C_ACCENT, 10, 200.0, 12.0, 0.3)
 
-	is_invulnerable = true
-	invuln_timer = 0.35
+func update(dt: float) -> void:
+	if not alive:
+		return
+	_t += dt
+	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	if stick.length_squared() > 0.0:
+		input = stick
+	if input.length() > 1.0:
+		input = input.normalized()
 
-	# Non-linear diminishing returns armor formula (RPG standard)
-	var effective_dmg = max(1.0, amount * (60.0 / (60.0 + armor)))
-	current_health = max(0.0, current_health - effective_dmg)
-	health_changed.emit(current_health, max_health)
+	invuln = maxf(0.0, invuln - dt)
+	dash_cd = maxf(0.0, dash_cd - dt)
+	hurt_flash = maxf(0.0, hurt_flash - dt * 4.0)
+	hp = minf(max_hp, hp + game.weapons.regen() * dt)
 
-	if hurt_sfx_timer <= 0.0:
-		hurt_sfx_timer = 0.14
-		hurt_flash_timer = 0.12
-		trigger_squash(Vector2(1.24, 0.76))
-		if not sound_mgr:
-			_get_managers()
-		if sound_mgr and sound_mgr.has_method("play_hit"):
-			sound_mgr.play_hit()
-		if camera_node and camera_node.has_method("add_trauma"):
-			camera_node.add_trauma(0.35)
-		if camera_node and camera_node.has_method("trigger_zoom_punch"):
-			camera_node.trigger_zoom_punch(0.04, 0.18)
+	if dash_t > 0.0:
+		dash_t -= dt
+		vel = dash_dir * Data.PLAYER.dash_speed
+		if int(_t * 60.0) % 2 == 0:
+			_trail.append([position, 0.25])
+	else:
+		var target := input * speed
+		var accel := 14.0 if input.length_squared() > 0.0 else 10.0
+		vel = vel.lerp(target, minf(1.0, accel * dt))
+	if input.length_squared() > 0.01:
+		facing = input.normalized()
+	position += vel * dt
+	_recoil = _recoil.lerp(Vector2.ZERO, minf(1.0, 18.0 * dt))
 
-		var cur = get_tree().current_scene
-		if cur and cur.has_method("trigger_damage_vignette"):
-			cur.trigger_damage_vignette(0.7, 0.25)
-		if cur and cur.has_method("trigger_chromatic_aberration_pulse"):
-			cur.trigger_chromatic_aberration_pulse(0.02, 0.15)
+	for tr in _trail:
+		tr[1] -= dt
+	_trail = _trail.filter(func(tr): return tr[1] > 0.0)
+	queue_redraw()
 
-		queue_redraw()
+func recoil(dir: Vector2) -> void:
+	_recoil = -dir * 2.5
 
-	if current_health <= 0.0:
-		player_died.emit()
-
-func get_xp_needed(lvl: int) -> int:
-	if lvl == 1:
-		return 25
-	elif lvl == 2:
-		return 55
-	elif lvl == 3:
-		return 110
-	elif lvl == 4:
-		return 180
-	return int(70.0 + pow(float(lvl), 1.95) * 16.0)
-
-func add_xp(amount: int) -> void:
-	xp += amount
-	while xp >= xp_to_next:
-		xp -= xp_to_next
-		level += 1
-		xp_to_next = get_xp_needed(level)
-
-		if not sound_mgr:
-			_get_managers()
-		if sound_mgr and sound_mgr.has_method("play_levelup"):
-			sound_mgr.play_levelup()
-
-		leveled_up.emit(level)
-	xp_changed.emit(xp, xp_to_next, level)
+func hurt(amount: float, from: Vector2, ignore_iframes: bool = false) -> void:
+	if not alive or game.paused_for_ui:
+		return
+	if dash_t > 0.0:
+		return
+	if invuln > 0.0 and not ignore_iframes:
+		return
+	hp -= amount
+	invuln = Data.PLAYER.invuln
+	hurt_flash = 1.0
+	vel += (position - from).normalized() * 220.0
+	game.on_player_hurt(amount)
+	if hp <= 0.0:
+		hp = 0.0
+		alive = false
+		visible = false
+		game.fx.explosion(position, 120.0, Data.C_ACCENT)
+		game.fx.burst(position, Color.WHITE, 30, 400.0, 18.0, 0.8)
+		died.emit()
 
 func heal(amount: float) -> void:
-	current_health = min(max_health, current_health + amount)
-	health_changed.emit(current_health, max_health)
+	hp = minf(max_hp, hp + amount)
+	game.fx.text(position + Vector2(0, -34), "+%d" % int(amount), Data.C_XP, 22)
 
-func apply_upgrade(upgrade_id: String) -> void:
-	# 1. Check Super Evolutions
-	match upgrade_id:
-		"railgun_evo":
-			evolved_weapons["railgun"] = true
-			if railgun_weapon and railgun_weapon.has_method("evolve_hyperion"):
-				railgun_weapon.evolve_hyperion()
-			return
-		"flame_evo":
-			evolved_weapons["flame"] = true
-			if flame_weapon and flame_weapon.has_method("evolve_sunstorm"):
-				flame_weapon.evolve_sunstorm()
-			return
-		"shockwave_evo":
-			evolved_weapons["shockwave"] = true
-			if shockwave_weapon and shockwave_weapon.has_method("evolve_supernova"):
-				shockwave_weapon.evolve_supernova()
-			return
-		"missile_evo":
-			evolved_weapons["missile"] = true
-			if missile_weapon and missile_weapon.has_method("evolve_barrage"):
-				missile_weapon.evolve_barrage()
-			return
-		"blade_evo":
-			evolved_weapons["blade"] = true
-			if blade_weapon and blade_weapon.has_method("evolve_vortex"):
-				blade_weapon.evolve_vortex()
-			return
-		"tesla_evo":
-			evolved_weapons["tesla"] = true
-			if tesla_weapon and tesla_weapon.has_method("evolve_mjolnir"):
-				tesla_weapon.evolve_mjolnir()
-			return
-		"mortar_evo":
-			evolved_weapons["mortar"] = true
-			if mortar_weapon and mortar_weapon.has_method("evolve_chernobyl"):
-				mortar_weapon.evolve_chernobyl()
-			return
-
-	# 2. Weapons Unlock & Upgrade
-	match upgrade_id:
-		"railgun":
-			if weapon_levels["railgun"] == 0:
-				weapon_levels["railgun"] = 1
-				_set_weapon_active(railgun_weapon, true)
-			else:
-				weapon_levels["railgun"] = min(5, weapon_levels["railgun"] + 1)
-				if railgun_weapon: railgun_weapon.upgrade_beam()
-		"flame":
-			if weapon_levels["flame"] == 0:
-				weapon_levels["flame"] = 1
-				_set_weapon_active(flame_weapon, true)
-			else:
-				weapon_levels["flame"] = min(5, weapon_levels["flame"] + 1)
-				if flame_weapon: flame_weapon.upgrade_flame()
-		"shockwave":
-			if weapon_levels["shockwave"] == 0:
-				weapon_levels["shockwave"] = 1
-				_set_weapon_active(shockwave_weapon, true)
-			else:
-				weapon_levels["shockwave"] = min(5, weapon_levels["shockwave"] + 1)
-				if shockwave_weapon: shockwave_weapon.upgrade_blast()
-		"missile":
-			if weapon_levels["missile"] == 0:
-				weapon_levels["missile"] = 1
-				_set_weapon_active(missile_weapon, true)
-			else:
-				weapon_levels["missile"] = min(5, weapon_levels["missile"] + 1)
-				if missile_weapon: missile_weapon.upgrade_missile()
-		"blade":
-			if weapon_levels["blade"] == 0:
-				weapon_levels["blade"] = 1
-				_set_weapon_active(blade_weapon, true)
-			else:
-				weapon_levels["blade"] = min(5, weapon_levels["blade"] + 1)
-				if blade_weapon: blade_weapon.upgrade_blade()
-		"tesla":
-			if weapon_levels["tesla"] == 0:
-				weapon_levels["tesla"] = 1
-				_set_weapon_active(tesla_weapon, true)
-			else:
-				weapon_levels["tesla"] = min(5, weapon_levels["tesla"] + 1)
-				if tesla_weapon: tesla_weapon.upgrade_tesla()
-		"mortar":
-			if weapon_levels["mortar"] == 0:
-				weapon_levels["mortar"] = 1
-				_set_weapon_active(mortar_weapon, true)
-			else:
-				weapon_levels["mortar"] = min(5, weapon_levels["mortar"] + 1)
-				if mortar_weapon: mortar_weapon.upgrade_mortar()
-
-		# 3. Passive Items
-		"energy_core":
-			passive_levels["energy_core"] = min(5, passive_levels["energy_core"] + 1)
-			if railgun_weapon: railgun_weapon.upgrade_speed(0.88)
-			if shockwave_weapon: shockwave_weapon.cooldown = max(0.8, shockwave_weapon.cooldown * 0.88)
-			if missile_weapon: missile_weapon.upgrade_speed(0.88)
-			if tesla_weapon: tesla_weapon.upgrade_speed(0.88)
-			if mortar_weapon: mortar_weapon.upgrade_speed(0.88)
-		"nano_armor":
-			passive_levels["nano_armor"] = min(5, passive_levels["nano_armor"] + 1)
-			max_health += 30.0
-			armor += 1.0
-			heal(60.0)
-		"thrusters":
-			passive_levels["thrusters"] = min(5, passive_levels["thrusters"] + 1)
-			move_speed += 35.0
-		"magnet":
-			passive_levels["magnet"] = min(5, passive_levels["magnet"] + 1)
-			pickup_radius += 20.0
-		"amp":
-			passive_levels["amp"] = min(5, passive_levels["amp"] + 1)
-			damage_multiplier += 0.20
-
-func get_weapon_node(w_id: String) -> Node2D:
-	match w_id:
-		"railgun": return railgun_weapon
-		"flame": return flame_weapon
-		"shockwave": return shockwave_weapon
-		"missile": return missile_weapon
-		"blade": return blade_weapon
-		"tesla": return tesla_weapon
-		"mortar": return mortar_weapon
-	return null
-
-func set_weapon_level(w_id: String, target_lvl: int, is_evo: bool = false) -> void:
-	target_lvl = clampi(target_lvl, 0, 5)
-	var node = get_weapon_node(w_id)
-	if not node:
-		return
-
-	if target_lvl == 0:
-		weapon_levels[w_id] = 0
-		evolved_weapons[w_id] = false
-		_set_weapon_active(node, false)
-		return
-
-	_set_weapon_active(node, true)
-	weapon_levels[w_id] = target_lvl
-
-	match w_id:
-		"railgun":
-			if node.has_method("upgrade_beam"):
-				for i in range(target_lvl - 1): node.upgrade_beam()
-			if is_evo and node.has_method("evolve_hyperion"):
-				evolved_weapons[w_id] = true
-				node.evolve_hyperion()
-			else:
-				evolved_weapons[w_id] = false
-		"flame":
-			if node.has_method("upgrade_flame"):
-				for i in range(target_lvl - 1): node.upgrade_flame()
-			if is_evo and node.has_method("evolve_sunstorm"):
-				evolved_weapons[w_id] = true
-				node.evolve_sunstorm()
-			else:
-				evolved_weapons[w_id] = false
-		"shockwave":
-			if node.has_method("upgrade_blast"):
-				for i in range(target_lvl - 1): node.upgrade_blast()
-			if is_evo and node.has_method("evolve_supernova"):
-				evolved_weapons[w_id] = true
-				node.evolve_supernova()
-			else:
-				evolved_weapons[w_id] = false
-		"missile":
-			if node.has_method("upgrade_missile"):
-				for i in range(target_lvl - 1): node.upgrade_missile()
-			if is_evo and node.has_method("evolve_barrage"):
-				evolved_weapons[w_id] = true
-				node.evolve_barrage()
-			else:
-				evolved_weapons[w_id] = false
-		"blade":
-			if node.has_method("upgrade_blade"):
-				for i in range(target_lvl - 1): node.upgrade_blade()
-			if is_evo and node.has_method("evolve_vortex"):
-				evolved_weapons[w_id] = true
-				node.evolve_vortex()
-			else:
-				evolved_weapons[w_id] = false
-		"tesla":
-			if node.has_method("upgrade_tesla"):
-				for i in range(target_lvl - 1): node.upgrade_tesla()
-			if is_evo and node.has_method("evolve_mjolnir"):
-				evolved_weapons[w_id] = true
-				node.evolve_mjolnir()
-			else:
-				evolved_weapons[w_id] = false
-		"mortar":
-			if node.has_method("upgrade_mortar"):
-				for i in range(target_lvl - 1): node.upgrade_mortar()
-			if is_evo and node.has_method("evolve_chernobyl"):
-				evolved_weapons[w_id] = true
-				node.evolve_chernobyl()
-			else:
-				evolved_weapons[w_id] = false
-
-func set_passive_level(p_id: String, target_lvl: int) -> void:
-	target_lvl = clampi(target_lvl, 0, 5)
-	passive_levels[p_id] = target_lvl
-	_recalculate_passives()
-
-func _recalculate_passives() -> void:
-	move_speed = 250.0
-	max_health = 100.0
-	armor = 0.0
-	pickup_radius = 48.0
-	damage_multiplier = 1.0
-
-	_apply_meta_progression()
-	_apply_operative_traits()
-
-	for i in range(passive_levels["energy_core"]):
-		if railgun_weapon and railgun_weapon.has_method("upgrade_speed"): railgun_weapon.upgrade_speed(0.88)
-		if shockwave_weapon: shockwave_weapon.cooldown = max(0.8, shockwave_weapon.cooldown * 0.88)
-		if missile_weapon and missile_weapon.has_method("upgrade_speed"): missile_weapon.upgrade_speed(0.88)
-		if tesla_weapon and tesla_weapon.has_method("upgrade_speed"): tesla_weapon.upgrade_speed(0.88)
-		if mortar_weapon and mortar_weapon.has_method("upgrade_speed"): mortar_weapon.upgrade_speed(0.88)
-
-	for i in range(passive_levels["nano_armor"]):
-		max_health += 30.0
-		armor += 1.0
-
-	for i in range(passive_levels["thrusters"]):
-		move_speed += 35.0
-
-	for i in range(passive_levels["magnet"]):
-		pickup_radius += 20.0
-
-	for i in range(passive_levels["amp"]):
-		damage_multiplier += 0.20
-
-	current_health = min(current_health, max_health)
-	health_changed.emit(current_health, max_health)
-
-func max_all_upgrades() -> void:
-	for w in weapon_levels.keys():
-		set_weapon_level(w, 5, true)
-	for p in passive_levels.keys():
-		set_passive_level(p, 5)
-
-func reset_all_upgrades() -> void:
-	for w in weapon_levels.keys():
-		set_weapon_level(w, 0, false)
-	for p in passive_levels.keys():
-		set_passive_level(p, 0)
-
-	match operative_id:
-		"pyro": set_weapon_level("flame", 1, false)
-		"volt": set_weapon_level("tesla", 1, false)
-		"colossus": set_weapon_level("blade", 1, false)
-		_: set_weapon_level("railgun", 1, false)
-
-func toggle_godmode(enabled: bool) -> void:
-	is_invulnerable = enabled
-	if enabled:
-		invuln_timer = 999999.0
-		current_health = max_health
-		health_changed.emit(current_health, max_health)
-	else:
-		invuln_timer = 0.0
-
+# ------------------------------------------------------------------ art
 func _draw() -> void:
-	# 1. BÓNG ĐỔ ISOMETRIC 2:1 ĐỘC LẬP TẠI MẶT SÀN (Ground Contact Plane)
-	# Không bị giật bởi recoil_offset hay flip_h!
-	var shadow_rx = 13.0
-	if active_frame == 1:
-		shadow_rx = 14.5 # Frame dẫm mạnh hấp thụ lực
-	elif active_frame == 3:
-		shadow_rx = 11.5 # Frame nhấc chân bung cao
-	draw_isometric_drop_shadow(self, Vector2.ZERO, shadow_rx, 0.50, 0.0)
+	var blink := invuln > 0.0 and dash_t <= 0.0 and int(_t * 20.0) % 2 == 0 and hurt_flash < 0.9
+	var bob := sin(_t * 4.0) * 2.0
 
-	# 2. THÂN THỂ CHIẾN BINH (Operative Body Sprite)
-	if player_frames.is_empty():
-		return
+	for tr in _trail:
+		var k: float = tr[1] / 0.25
+		var lp: Vector2 = tr[0] - position
+		draw_circle(lp + Vector2(0, -6), radius * 1.1, Color(Data.C_ACCENT, 0.22 * k))
 
-	var tex = player_frames[clampi(active_frame, 0, player_frames.size() - 1)]
-	var flip = 1.0 if facing_right else -1.0
-	var col = Color(5.0, 1.5, 1.5, 1.0) if hurt_flash_timer > 0.0 else Color.WHITE
-	if is_invulnerable:
-		var pulse = (int(float(Time.get_ticks_msec()) / 80.0) % 2) * 0.5 + 0.5
-		col = Color(1.0, 3.0, 3.0, pulse)
+	# ground shadow + light pool
+	_ellipse(Vector2(2, 10), Vector2(radius * 1.3, radius * 0.55), Color(0, 0, 0.02, 0.5))
+	_ellipse(Vector2(0, 8), Vector2(radius * 2.4, radius * 1.1), Color(Data.C_ACCENT, 0.05))
 
-	draw_set_transform(recoil_offset, 0.0, Vector2(flip * sprite_scale.x, sprite_scale.y))
-	draw_texture(tex, Vector2(-24.0, -41.0), col)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var c := Vector2(0, -8 + bob) + _recoil
+	var body := Color("1a2742")
+	var rim := Data.C_ACCENT
+	if hurt_flash > 0.0:
+		body = body.lerp(Color(1, 0.3, 0.4), hurt_flash)
+		rim = rim.lerp(Color.WHITE, hurt_flash)
+	if blink:
+		rim.a = 0.35
+		body.a = 0.5
 
-static func draw_isometric_drop_shadow(canvas: CanvasItem, center: Vector2, radius_x: float, base_alpha: float, height_z: float = 0.0) -> void:
-	var scale_factor = clampf(1.0 - (height_z / 300.0) * 0.4, 0.3, 1.0)
-	var final_alpha = clampf(base_alpha * (1.0 - (height_z / 300.0) * 0.6), 0.05, 1.0)
-	var rx = radius_x * scale_factor
-	canvas.draw_set_transform(center, 0.0, Vector2(1.0, 0.5))
-	canvas.draw_circle(Vector2.ZERO, rx, Color(0.0, 0.0, 0.0, final_alpha * 0.35))
-	canvas.draw_circle(Vector2.ZERO, rx * 0.65, Color(0.0, 0.0, 0.0, final_alpha * 0.55))
-	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# thruster glow under the hull
+	var thrust := 0.6 + 0.4 * sin(_t * 30.0)
+	draw_circle(c + Vector2(0, 6), radius * 0.9, Color(rim, 0.15 * thrust))
 
+	# octagon hull, slightly rotated toward facing
+	var ang := facing.angle()
+	var hull := PackedVector2Array()
+	for i in 8:
+		var a := ang + TAU * float(i) / 8.0 + PI / 8.0
+		hull.append(c + Vector2(cos(a), sin(a) * 0.86) * radius * 1.05)
+	draw_colored_polygon(hull, body)
+	hull.append(hull[0])
+	draw_polyline(hull, rim, 2.0, true)
+
+	# side pods
+	for s in [-1.0, 1.0]:
+		var side := Vector2.from_angle(ang + s * PI * 0.5)
+		var pod := c + side * radius * 1.05
+		draw_circle(pod, 4.5, body.lightened(0.15))
+		draw_arc(pod, 4.5, 0, TAU, 16, Color(rim, 0.8), 1.5, true)
+
+	# nose / cannon
+	var nose := c + facing * radius * 0.95
+	draw_line(c + facing * radius * 0.3, nose + facing * 4.0, rim.lightened(0.3), 4.0, true)
+
+	# glowing core
+	var pulse := 0.75 + 0.25 * sin(_t * 6.0)
+	draw_circle(c, radius * 0.62, Color(rim, 0.25))
+	draw_circle(c, radius * 0.42 * pulse, Color(rim, 0.9))
+	draw_circle(c - Vector2(1.5, 1.5), radius * 0.18, Color(1, 1, 1, 0.95))
+
+	# health bar under the drone, only when hurt
+	if hp < max_hp:
+		var w := 38.0
+		var y := radius + 10.0
+		draw_rect(Rect2(-w * 0.5 - 1, y - 1, w + 2, 6), Color(0, 0, 0, 0.6))
+		draw_rect(Rect2(-w * 0.5, y, w * hp / max_hp, 4), Data.C_HP if hp / max_hp < 0.35 else Data.C_XP)
+
+	# dash ready pip
+	if dash_cd > 0.0:
+		var k := 1.0 - dash_cd / dash_cooldown()
+		draw_arc(c, radius + 7.0, -PI * 0.5, -PI * 0.5 + TAU * k, 32, Color(rim, 0.35), 2.0, true)
+
+func _ellipse(off: Vector2, r: Vector2, col: Color) -> void:
+	var pts := PackedVector2Array()
+	for i in 24:
+		var a := TAU * float(i) / 24.0
+		pts.append(off + Vector2(cos(a) * r.x, sin(a) * r.y))
+	draw_colored_polygon(pts, col)

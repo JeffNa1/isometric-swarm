@@ -5,3 +5,6 @@
 *.tmp
 debug_engine.log
 godot_run.log
+
+# web export output
+build/

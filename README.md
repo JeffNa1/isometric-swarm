@@ -1,49 +1,80 @@
-# 👾 Isometric Swarm Survivor
+# Isometric Swarm
 
-A high-octane, dopamine-inducing 2D Isometric Swarm Survival game built with **Godot Engine 4.3 (GL Compatibility / Forward+)**, inspired by *Vampire Survivors*, *Synthetik*, and *Hades*.
+A fast, absurdly outnumbered swarm-survival game built with **Godot 4.3** (GL Compatibility renderer, so it runs on desktop, mobile and the web).
 
-![Godot Engine](https://img.shields.io/badge/Godot_Engine-4.3_Stable-478CBF?logo=godotengine&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Status](https://img.shields.io/badge/Status-Playable_Alpha-orange)
+You pilot a single hover-drone. Your weapons fire on their own; you steer, dash, and choose upgrades. Survive ten minutes, kill the Hive Queen.
 
----
+## Play
 
-## 🌟 Key Features
+- **Phone / browser:** every push to `master` builds a web version and publishes it to GitHub Pages (see [Web build](#web-build)).
+- **Desktop:** open `project.godot` in Godot 4.3 and press <kbd>F5</kbd>.
 
-### 🌌 1. True 2:1 Isometric Cyber Citadel Arena
-- **Procedural 3D Beveled Floor Shader (`isometric_ground.gdshader`)**: Real-time calculated normal bevels, ambient occlusion, mechanical corner rivets, and tactile recessed seams.
-- **Multi-Tier Neon Energy Grid**: Recessed groove channels with periodic traveling plasma surges and pulsating vertex junction nodes.
-- **Procedural Tile Variations**: Heavy ventilation heat grates with thermal sub-floor glow, cybernetic circuit motherboards, and industrial hazard chevron striping.
-- **Cosmic Void Abyss & Hologram Forcefield**: Outer boundaries fracture into floating platforms over a deep-space nebula starfield with high-voltage containment laser barriers.
-- **Interactive Environmental Props**: Industrial Tesla power generator towers and ground steam vents puffing cooling vapor.
+| Action | Keyboard | Gamepad | Touch |
+| --- | --- | --- | --- |
+| Move | WASD / arrows | Left stick | Drag anywhere |
+| Dash (brief invulnerability) | Space / Shift | A / RB | DASH button |
+| Pause | Esc / P | Start | ❚❚ button |
+| Pick upgrade | 1 / 2 / 3 or click | – | Tap a card |
+| FPS overlay | F3 | – | – |
 
-### 🦗 2. Massive Swarm Simulation (5,000+ Popcorn Enemies)
-- **High-Performance MultiMeshInstance2D**: Renders thousands of scurrying arachnoid crawlers, agile purple scouts, and volcanic behemoth brutes at a locked 60+ FPS.
-- **Custom Spatial Hash Partitioning**: O(1) broadphase spatial neighbor queries for flocking, separation, and hit detection.
-- **Vampire Survivors Gold Standard Pacing**: Satisfying screen-clearing popcorn enemy explosions, blood decals, chitin shard physics, and directional camera punch impulses.
+## The run
 
-### ⚡ 3. Deep Arsenal & Super Evolutions
-- **7 Unique Weapon Classes**: Railgun, Flamethrower, Shockwave Blast, Magic Missiles, Blade Orbit, Tesla Chain Lightning, and Bio Mortar.
-- **Super Evolution Synergy Tree**: Combine max-level weapons with specialized passives to unlock game-changing evolutionary forms (Hyperion Beam, Sunstorm, Supernova, Mjolnir, etc.).
-- **Juicy Arcade Feedback**: Directional camera punch, micro-hitstop, screen shake anti-stacking, pentatonic gem pickup chimes, and floating damage numbers.
+| Time | What happens |
+| --- | --- |
+| 0:00 | Mites everywhere. Level up fast and pick your first weapons. |
+| 0:40, then every 50s | **Swarm surge**: a full ring of enemies closes in. |
+| 0:45 | Darts join: fast flankers that overshoot. |
+| 1:30 / 3:30 / 6:30 / 8:30 | **Champion**: a gold elite that drops a supply cache (free upgrade + heal). |
+| 2:00 | Brutes: slow, tanky, shrug off knockback. |
+| 2:50 | Spitters: keep their distance and lob slow, readable shots. |
+| 4:20 | Bombers: rush in, fuse, explode. They hurt their friends too. |
+| 5:00 | **Broodmother** mid-boss. |
+| 10:00 | **Hive Queen**. Kill her to win. |
 
-### 🎮 4. Controls
-- **W / A / S / D** or **Arrow Keys**: Move (True isometric 2:1 directional glide)
-- **Auto-Aim & Auto-Fire**: Weapons automatically target closest threats or track movement
-- **Mouse / Buttons**: Interactive UI navigation and level-up card selection
+The director keeps the population climbing from about 50 to 1,500 live enemies. On weaker devices the cap trims itself automatically to hold the frame rate.
 
----
+## Arsenal
 
-## 🛠️ Running the Project
+Hold up to **4 weapons** and **4 systems**, each up to level 5. Once everything is maxed, level-ups offer repairs and permanent damage boosts.
 
-1. Download **[Godot Engine 4.3 Stable](https://godotengine.org/download)**.
-2. Clone this repository:
-   ```bash
-   git clone https://github.com/JeffNa1/isometric-swarm.git
-   ```
-3. Open Godot, click **Import**, select `project.godot`, and press **Run (F5)**!
+**Weapons:** Pulse Cannon (starter, auto-aimed bolts) · Halo Blades (orbiting) · Arc Coil (chain lightning) · Nova Pulse (knockback blast) · Rail Lance (piercing beam into the densest crowd) · Cluster Mortar (shells on distant packs)
 
----
+**Systems:** Overcharge (damage) · Coolant (fire rate) · Amplifier (area) · Servos (speed and dash) · Nanoplating (HP and regen) · Tractor Field (pickup range and XP)
 
-## 📜 License
-MIT License. Created with love for swarm survivor games.
+Field drops: ❤ repair, 🧲 vacuum all XP, 💣 clear the screen.
+
+## Code tour
+
+Everything is built in code; scenes are just entry points.
+
+```
+scripts/
+  data.gd         Autoload. Palette, every balance number, theme, save data, input map
+  sfx.gd          Autoload. Procedurally synthesised, rate-limited sound effects
+  game.gd         Run controller: spawn director, events, XP/levels, camera, end of run
+  swarm.gd        Struct-of-arrays enemy sim, spatial grid, crowd pressure, one draw call
+  weapons.gd      Loadout, derived stats, all weapon logic and melee/area visuals
+  projectiles.gd  Player bolts and enemy shots
+  pickups.gd      XP crystals (auto-merging) and field items
+  fx.gd           Particles, rings, ground residue, damage numbers (all budgeted)
+  boss.gd         Broodmother / Hive Queen with telegraphed attack patterns
+  player.gd       Movement, dash, i-frames, procedural drone art
+  batch.gd        MultiMesh helper: thousands of sprites, one draw call
+  ui/             HUD + touch controls, level-up cards, overlays, menu, vector icons
+shaders/
+  floor.gdshader  Calm isometric deck tiles
+  swarm.gdshader  Every enemy type drawn with signed distance fields
+  glow / gem / screen
+```
+
+**Tuning:** almost all balance lives at the top of `scripts/data.gd` (`ENEMIES`, `SPAWN_TABLE`, `target_population`, `hp_scale`, `xp_to_next`). Weapon level curves are in `weapons.gd` (`_fire_*` functions and `_cooldown`).
+
+## Web build
+
+`.github/workflows/web.yml` exports the **Web** preset with threads disabled, so it runs on GitHub Pages without special headers, and deploys it.
+
+One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**. After the next push to `master` (or a manual run from the Actions tab), the game is live at `https://<user>.github.io/isometric-swarm/`.
+
+## License
+
+MIT. Font: [Chakra Petch](https://fonts.google.com/specimen/Chakra+Petch) (SIL Open Font License, see `assets/fonts/OFL.txt`).

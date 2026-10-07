@@ -1,222 +1,220 @@
-extends CharacterBody2D
+extends Node2D
+## Bosses. Tier 1 = Broodmother (mid-run), tier 2 = Hive Queen (finale).
+## Every attack is telegraphed: rings flash before bursts, lines before charges.
 
-const SpriteFactory = preload("res://scripts/sprite_factory.gd")
-const TREASURE_CHEST_SCENE = preload("res://scenes/treasure_chest.tscn")
-const GEM_SCENE = preload("res://scenes/gem.tscn")
+var game: Node
+var tier := 1
+var title := ""
+var radius := 46.0
+var max_hp := 9000.0
+var hp := 9000.0
+var speed := 70.0
+var contact := 24.0
+var color := Color("ff3d81")
+var vel := Vector2.ZERO
+var flash := 0.0
+var _t := 0.0
+var _attack_t := 3.0
+var _spawn_t := 5.0
+var _state := "chase"   # chase / windup / charge / burst
+var _state_t := 0.0
+var _charge_dir := Vector2.ZERO
+var _spiral := 0.0
+var _pattern := 0
+var dead := false
 
-signal boss_health_changed(current: float, maximum: float)
-signal boss_defeated()
-
-@export var max_health: float = 4500.0
-var current_health: float = 4500.0
-var hit_radius: float = 160.0
-
-enum State { CHASE, WINDUP, CHARGE, QUAKE }
-var current_state: State = State.CHASE
-
-var state_timer: float = 0.0
-var attack_cooldown: float = 4.0
-var hurt_flash_timer: float = 0.0
-var charge_dir: Vector2 = Vector2.ZERO
-
-var player_ref: CharacterBody2D = null
-var sound_mgr: Node = null
-var particle_mgr: Node2D = null
-var camera_node: Camera2D = null
-var hud: CanvasLayer = null
-
-static var boss_tex: ImageTexture = null
-
-func _ready() -> void:
-	if not boss_tex:
-		boss_tex = SpriteFactory.create_boss_texture()
-	current_health = max_health
-	add_to_group("boss")
-	_get_managers()
-	queue_redraw()
-
-func _get_managers() -> void:
-	var cur = get_tree().current_scene
-	if cur:
-		player_ref = cur.get_node_or_null("Entities/Player")
-		sound_mgr = cur.get_node_or_null("SoundManager")
-		particle_mgr = cur.get_node_or_null("ParticleManager")
-		camera_node = cur.get_node_or_null("Camera2D")
-		hud = cur.get_node_or_null("HUD")
-		if hud and hud.has_method("show_boss_bar"):
-			hud.show_boss_bar("APEX LEVIATHAN", current_health, max_health)
-
-func _physics_process(delta: float) -> void:
-	if hurt_flash_timer > 0.0:
-		hurt_flash_timer -= delta
-		queue_redraw()
-
-	if not player_ref:
-		_get_managers()
-
-	if not player_ref or not is_instance_valid(player_ref):
-		return
-
-	var p_pos = player_ref.global_position
-	var to_player = p_pos - global_position
-	var dist = to_player.length()
-
-	state_timer += delta
-
-	match current_state:
-		State.CHASE:
-			var move_dir = Vector2(to_player.x, to_player.y * 0.75).normalized()
-			velocity = velocity.move_toward(move_dir * 135.0, 600.0 * delta)
-			move_and_slide()
-
-			if state_timer >= attack_cooldown:
-				state_timer = 0.0
-				if randf() < 0.6:
-					_start_charge(p_pos)
-				else:
-					_start_quake()
-
-		State.WINDUP:
-			velocity = velocity.move_toward(Vector2.ZERO, 900.0 * delta)
-			move_and_slide()
-			# Telegraph red sparks
-			if particle_mgr and randf() < 0.4:
-				particle_mgr.spawn_sparks(global_position, Color(3.8, 0.4, 0.2, 1.0), 3)
-
-			if state_timer >= 0.75:
-				state_timer = 0.0
-				current_state = State.CHARGE
-				if sound_mgr and sound_mgr.has_method("play_alarm"):
-					sound_mgr.play_alarm()
-
-		State.CHARGE:
-			velocity = velocity.move_toward(charge_dir * 490.0, 1800.0 * delta)
-			move_and_slide()
-
-			if particle_mgr and randf() < 0.6:
-				particle_mgr.spawn_blood_burst(global_position, Color(3.5, 0.8, 0.1, 1.0), 3)
-
-			if state_timer >= 1.25:
-				state_timer = 0.0
-				current_state = State.CHASE
-				attack_cooldown = randf_range(3.5, 5.5)
-
-		State.QUAKE:
-			velocity = velocity.move_toward(Vector2.ZERO, 900.0 * delta)
-			move_and_slide()
-			if state_timer >= 0.5:
-				_execute_quake()
-				state_timer = 0.0
-				current_state = State.CHASE
-				attack_cooldown = randf_range(4.0, 6.0)
-
-	# Contact damage to player (Scaled for 5x Leviathan)
-	if dist < 175.0 and player_ref.has_method("take_damage"):
-		player_ref.take_damage(35.0 * delta * 2.0)
-
-	queue_redraw()
-
-func _start_charge(target: Vector2) -> void:
-	current_state = State.WINDUP
-	charge_dir = (target - global_position).normalized()
-	if camera_node and camera_node.has_method("add_trauma"):
-		camera_node.add_trauma(0.25)
-
-func _start_quake() -> void:
-	current_state = State.QUAKE
-	if camera_node and camera_node.has_method("add_trauma"):
-		camera_node.add_trauma(0.35)
-
-func _execute_quake() -> void:
-	if sound_mgr and sound_mgr.has_method("play_shockwave"):
-		sound_mgr.play_shockwave()
-
-	if camera_node and camera_node.has_method("add_trauma"):
-		camera_node.add_trauma(0.7)
-
-	if particle_mgr:
-		particle_mgr.spawn_shockwave_debris(global_position, 350.0, 48)
-		particle_mgr.spawn_blood_burst(global_position, Color(3.8, 1.0, 0.2, 1.0), 36)
-
-	# Shockwave knockback / damage to player if nearby (scaled for 5x boss)
-	if player_ref and global_position.distance_to(player_ref.global_position) < 420.0:
-		player_ref.take_damage(35.0)
+func setup(g: Node, t: int) -> void:
+	game = g
+	tier = t
+	z_index = 2
+	if tier == 1:
+		title = "BROODMOTHER"
+		radius = 46.0
+		max_hp = 9000.0
+		speed = 74.0
+		color = Color("ff3d81")
+	else:
+		title = "HIVE QUEEN"
+		radius = 62.0
+		max_hp = 42000.0
+		speed = 84.0
+		contact = 32.0
+		color = Color("c47dff")
+	hp = max_hp
 
 func take_damage(amount: float) -> void:
-	current_health = max(0.0, current_health - amount)
-	hurt_flash_timer = 0.12
-	boss_health_changed.emit(current_health, max_health)
-
-	if hud and hud.has_method("update_boss_health"):
-		hud.update_boss_health(current_health, max_health)
-
-	var cur = get_tree().current_scene
-	var txt_mgr = cur.get_node_or_null("FloatingTextManager") if cur else null
-	if txt_mgr and randf() < 0.4:
-		txt_mgr.spawn_damage(global_position + Vector2(randf_range(-60, 60), randf_range(-220, -90)), amount, true)
-
-	if current_health <= 0.0:
-		_die()
-
-var is_dead: bool = false
-
-func _die() -> void:
-	if is_dead:
+	if dead:
 		return
-	is_dead = true
-	boss_defeated.emit()
+	hp -= amount
+	flash = 1.0
+	game.on_damage_dealt(amount)
+	if randf() < 0.15:
+		game.fx.text(position + Vector2(randf_range(-30, 30), -radius - 10), str(int(amount)), Color(1, 0.9, 0.7), 18)
+	if hp <= 0.0:
+		dead = true
+		game.on_boss_killed(self)
 
-	if hud and hud.has_method("hide_boss_bar"):
-		hud.hide_boss_bar()
+func update(dt: float) -> void:
+	_t += dt
+	flash = maxf(0.0, flash - dt * 6.0)
+	var pp: Vector2 = game.player.position
+	var to := pp - position
+	var dir := to.normalized()
+	var enraged := hp < max_hp * 0.5
 
-	if sound_mgr and sound_mgr.has_method("play_nuke"):
-		sound_mgr.play_nuke()
+	match _state:
+		"chase":
+			vel = vel.lerp(dir * speed * (1.25 if enraged else 1.0), minf(1.0, 3.0 * dt))
+			_attack_t -= dt
+			_spawn_t -= dt
+			if _attack_t <= 0.0:
+				_pattern = (_pattern + 1) % (3 if tier == 1 else 4)
+				_state = "windup"
+				_state_t = 0.0
+				_charge_dir = dir
+				vel *= 0.2
+			if _spawn_t <= 0.0:
+				_spawn_t = 7.0 if tier == 1 else 5.5
+				_spawn_brood()
+		"windup":
+			_state_t += dt
+			vel = vel.lerp(Vector2.ZERO, minf(1.0, 6.0 * dt))
+			if _pattern == 0:
+				_charge_dir = _charge_dir.slerp(dir, minf(1.0, 2.0 * dt))
+			if _state_t >= 0.85:
+				_state_t = 0.0
+				match _pattern:
+					0:
+						_state = "charge"
+						Sfx.play("dash", 0.6)
+					1:
+						_radial(18 if tier == 1 else 26, 165.0)
+						if tier == 2:
+							_radial(26, 120.0, PI / 26.0)
+						_end_attack()
+					2:
+						_state = "burst"
+						_spiral = dir.angle()
+					3:
+						_aimed_fan(dir)
+						_end_attack()
+		"charge":
+			_state_t += dt
+			vel = _charge_dir * (560.0 if tier == 1 else 640.0)
+			if int(_t * 60.0) % 3 == 0:
+				game.fx.burst(position, color, 3, 80.0, 18.0, 0.4)
+			if _state_t >= 0.65:
+				_end_attack()
+		"burst":
+			_state_t += dt
+			vel = Vector2.ZERO
+			if int(_state_t * 60.0) % 4 == 0:
+				var arms := 3 if tier == 1 else 5
+				for a in arms:
+					var ang := _spiral + TAU * float(a) / float(arms)
+					game.projectiles.enemy_shoot(position + Vector2.from_angle(ang) * radius, Vector2.from_angle(ang) * 150.0, contact * 0.5)
+				_spiral += 0.21
+			if _state_t >= 1.6:
+				_end_attack()
 
-	if camera_node and camera_node.has_method("add_trauma"):
-		camera_node.add_trauma(0.85)
+	position += vel * dt
+	if to.length() < radius + game.player.radius:
+		game.player.hurt(contact, position)
+	queue_redraw()
 
-	if particle_mgr:
-		for k in range(8):
-			var off = Vector2(randf_range(-120, 120), randf_range(-120, 120))
-			particle_mgr.spawn_blood_burst(global_position + off, Color(3.8, 1.2, 0.2, 1.0), 24)
-			particle_mgr.spawn_shockwave_debris(global_position + off, 100.0, 20)
+func _end_attack() -> void:
+	_state = "chase"
+	var enraged := hp < max_hp * 0.5
+	_attack_t = (2.2 if enraged else 3.0) * (0.85 if tier == 2 else 1.0)
 
-	var entities = get_tree().current_scene.get_node_or_null("Entities")
-	if not entities:
-		entities = get_parent()
+func _radial(n: int, spd: float, offset: float = 0.0) -> void:
+	for k in n:
+		var a := TAU * float(k) / float(n) + offset + _t
+		game.projectiles.enemy_shoot(position + Vector2.from_angle(a) * radius, Vector2.from_angle(a) * spd, contact * 0.5)
+	game.fx.ring(position, radius * 2.2, color, 0.4, 8.0, radius)
+	Sfx.play("nova", 0.6)
 
-	# Drop Golden Treasure Chest
-	var chest = TREASURE_CHEST_SCENE.instantiate()
-	chest.global_position = global_position
-	entities.call_deferred("add_child", chest)
+func _aimed_fan(dir: Vector2) -> void:
+	for k in 9:
+		var a := dir.angle() + (float(k) - 4.0) * 0.12
+		game.projectiles.enemy_shoot(position + Vector2.from_angle(a) * radius, Vector2.from_angle(a) * 210.0, contact * 0.5)
+	Sfx.play("zap", 0.6)
 
-	# Drop cluster of 8 Super Gems
-	var cur = get_tree().current_scene
-	if cur and cur.has_method("spawn_gem"):
-		for g in range(8):
-			var angle = (TAU / 8.0) * float(g)
-			cur.spawn_gem(global_position + Vector2(cos(angle) * 75.0, sin(angle) * 50.0), 60, true)
-	else:
-		for g in range(8):
-			var gem = GEM_SCENE.instantiate()
-			gem.xp_value = 60
-			gem.is_super_gem = true
-			var angle = (TAU / 8.0) * float(g)
-			gem.global_position = global_position + Vector2(cos(angle) * 75.0, sin(angle) * 50.0)
-			entities.call_deferred("add_child", gem)
+func _spawn_brood() -> void:
+	var n := 18 if tier == 1 else 26
+	var type := Data.E.MITE if tier == 1 else Data.E.DART
+	for k in n:
+		var a := TAU * float(k) / float(n)
+		game.swarm.spawn(position + Vector2.from_angle(a) * (radius + 20.0), type, game.elapsed)
+	game.fx.ring(position, radius * 2.0, color, 0.5, 6.0, radius)
 
-	queue_free()
-
+# ------------------------------------------------------------------ art
 func _draw() -> void:
-	# Warning telegraph in windup
-	if current_state == State.WINDUP:
-		var line_end = charge_dir * 550.0
-		draw_line(Vector2.ZERO, line_end, Color(3.5, 0.2, 0.2, 0.65), 5.0)
-		draw_circle(line_end, 28.0, Color(3.5, 0.2, 0.2, 0.45))
+	var r := radius
+	var bob := sin(_t * 2.5) * 3.0
+	var face: float = vel.angle() if vel.length() > 10.0 else (game.player.position - position).angle()
 
-	if boss_tex:
-		var col = Color(5.0, 5.0, 5.0, 1.0) if hurt_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, 1.0)
-		var flip = 1.0 if (player_ref and player_ref.global_position.x > global_position.x) else -1.0
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2(flip * 5.0, 5.0))
-		draw_texture(boss_tex, Vector2(-48.0, -68.0), col)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# telegraphs drawn first, on the ground
+	if _state == "windup":
+		var k := _state_t / 0.85
+		match _pattern:
+			0:
+				var w := r * 1.6
+				var end := _charge_dir * (560.0 if tier == 1 else 640.0) * 0.65
+				draw_line(Vector2.ZERO, end, Color(color, 0.12 + 0.18 * k), w, true)
+				draw_line(Vector2.ZERO, end * k, Color(color, 0.35), 3.0, true)
+			1, 3:
+				draw_arc(Vector2.ZERO, r * (2.4 - 1.2 * k), 0, TAU, 64, Color(color, 0.25 + 0.5 * k), 4.0, true)
+			2:
+				for a in 6:
+					var ang := _t * 2.0 + TAU * a / 6.0
+					draw_line(Vector2.ZERO, Vector2.from_angle(ang) * r * 2.0 * k, Color(color, 0.4), 3.0, true)
+
+	# shadow
+	var sh := PackedVector2Array()
+	for i in 32:
+		var a := TAU * i / 32.0
+		sh.append(Vector2(cos(a) * r * 1.25 + 6, sin(a) * r * 0.5 + r * 0.55))
+	draw_colored_polygon(sh, Color(0, 0, 0.02, 0.5))
+
+	var c := Vector2(0, -r * 0.25 + bob)
+	var base := color.darkened(0.55)
+	if flash > 0.0:
+		base = base.lerp(Color.WHITE, flash * 0.6)
+
+	# legs
+	for s in [-1.0, 1.0]:
+		for k in 4:
+			var la: float = face + s * (0.7 + k * 0.5)
+			var wig := sin(_t * 9.0 + k * 1.3 + s) * 0.12
+			var hip := c + Vector2.from_angle(la) * r * 0.7
+			var knee := c + Vector2.from_angle(la + wig) * r * 1.35 + Vector2(0, -8)
+			var foot := c + Vector2.from_angle(la + wig * 2.0) * r * 1.6 + Vector2(0, r * 0.35)
+			draw_polyline(PackedVector2Array([hip, knee, foot]), base.darkened(0.3), 6.0 if tier == 1 else 8.0, true)
+
+	# abdomen plates
+	var back := c - Vector2.from_angle(face) * r * 0.55
+	for k in 3:
+		var pr := r * (0.95 - k * 0.18)
+		draw_circle(back - Vector2.from_angle(face) * k * r * 0.28, pr, base.lightened(0.05 * k))
+		draw_arc(back - Vector2.from_angle(face) * k * r * 0.28, pr, 0, TAU, 40, Color(color, 0.45), 2.0, true)
+
+	# head + carapace
+	draw_circle(c, r, base)
+	draw_arc(c, r, 0, TAU, 48, color.lightened(0.2), 3.0, true)
+	draw_arc(c, r * 0.68, face - 1.2, face + 1.2, 24, Color(color, 0.5), 3.0, true)
+	# glowing sac
+	var pulse := 0.7 + 0.3 * sin(_t * (8.0 if _state == "windup" else 3.0))
+	draw_circle(c - Vector2.from_angle(face) * r * 0.1, r * 0.38, Color(color, 0.35 * pulse))
+	draw_circle(c - Vector2.from_angle(face) * r * 0.1, r * 0.2, Color(color.lightened(0.5), 0.9 * pulse))
+	# eyes
+	for s in [-1.0, 1.0]:
+		var e := c + Vector2.from_angle(face + s * 0.38) * r * 0.72
+		draw_circle(e, r * 0.11, Color(1, 0.95, 0.9))
+		draw_circle(e, r * 0.2, Color(color, 0.3))
+	if tier == 2:
+		# crown spikes
+		for k in 5:
+			var a: float = face + PI + (float(k) - 2.0) * 0.35
+			var b := c + Vector2.from_angle(a) * r * 0.9
+			draw_line(b, b + Vector2.from_angle(a) * r * 0.45, Color(color.lightened(0.3), 0.9), 5.0, true)
